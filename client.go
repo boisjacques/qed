@@ -166,10 +166,6 @@ func newClient(
 			}
 		}
 	}
-	onClose := func(protocol.ConnectionID) {}
-	if closeCallback != nil {
-		onClose = closeCallback
-	}
 	c := &client{
 		conn:              &conn{pconn: pconn, currentAddr: remoteAddr},
 		createdPacketConn: createdPacketConn,
@@ -177,7 +173,7 @@ func newClient(
 		config:            config,
 		version:           config.Versions[0],
 		handshakeChan:     make(chan struct{}),
-		closeCallback:     onClose,
+		closeCallback:     closeCallback,
 		logger:            utils.DefaultLogger.WithPrefix("client"),
 	}
 	return c, c.generateConnectionIDs()
