@@ -6,12 +6,12 @@ import (
 	"math"
 
 	"github.com/golang/mock/gomock"
-	"github.com/lucas-clemente/quic-go/internal/flowcontrol"
-	"github.com/lucas-clemente/quic-go/internal/handshake"
-	"github.com/lucas-clemente/quic-go/internal/mocks"
-	"github.com/lucas-clemente/quic-go/internal/protocol"
-	"github.com/lucas-clemente/quic-go/internal/qerr"
-	"github.com/lucas-clemente/quic-go/internal/wire"
+	"github.com/boisjacques/qed/internal/flowcontrol"
+	"github.com/boisjacques/qed/internal/handshake"
+	"github.com/boisjacques/qed/internal/mocks"
+	"github.com/boisjacques/qed/internal/protocol"
+	"github.com/boisjacques/qed/internal/qerr"
+	"github.com/boisjacques/qed/internal/wire"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"

@@ -6,12 +6,12 @@ import (
 	"net"
 
 	"github.com/golang/mock/gomock"
-	"github.com/lucas-clemente/quic-go/internal/ackhandler"
-	"github.com/lucas-clemente/quic-go/internal/handshake"
-	"github.com/lucas-clemente/quic-go/internal/mocks"
-	"github.com/lucas-clemente/quic-go/internal/mocks/ackhandler"
-	"github.com/lucas-clemente/quic-go/internal/protocol"
-	"github.com/lucas-clemente/quic-go/internal/wire"
+	"github.com/boisjacques/qed/internal/ackhandler"
+	"github.com/boisjacques/qed/internal/handshake"
+	"github.com/boisjacques/qed/internal/mocks"
+	"github.com/boisjacques/qed/internal/mocks/ackhandler"
+	"github.com/boisjacques/qed/internal/protocol"
+	"github.com/boisjacques/qed/internal/wire"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )

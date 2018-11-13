@@ -9,10 +9,10 @@ import (
 	"os"
 	"time"
 
-	quic "github.com/lucas-clemente/quic-go"
-	"github.com/lucas-clemente/quic-go/h2quic"
-	"github.com/lucas-clemente/quic-go/integrationtests/tools/testserver"
-	"github.com/lucas-clemente/quic-go/internal/protocol"
+	quic "github.com/boisjacques/qed"
+	"github.com/boisjacques/qed/h2quic"
+	"github.com/boisjacques/qed/integrationtests/tools/testserver"
+	"github.com/boisjacques/qed/internal/protocol"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"

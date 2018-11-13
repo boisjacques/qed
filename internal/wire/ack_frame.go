@@ -6,8 +6,8 @@ import (
 	"sort"
 	"time"
 
-	"github.com/lucas-clemente/quic-go/internal/protocol"
-	"github.com/lucas-clemente/quic-go/internal/utils"
+	"github.com/boisjacques/qed/internal/protocol"
+	"github.com/boisjacques/qed/internal/utils"
 )
 
 // TODO: use the value sent in the transport parameters

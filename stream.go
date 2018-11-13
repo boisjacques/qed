@@ -5,9 +5,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/lucas-clemente/quic-go/internal/flowcontrol"
-	"github.com/lucas-clemente/quic-go/internal/protocol"
-	"github.com/lucas-clemente/quic-go/internal/wire"
+	"github.com/boisjacques/qed/internal/flowcontrol"
+	"github.com/boisjacques/qed/internal/protocol"
+	"github.com/boisjacques/qed/internal/wire"
 )
 
 const errorCodeStopping protocol.ApplicationErrorCode = 0

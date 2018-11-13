@@ -3,7 +3,7 @@ package ackhandler
 import (
 	"fmt"
 
-	"github.com/lucas-clemente/quic-go/internal/protocol"
+	"github.com/boisjacques/qed/internal/protocol"
 )
 
 type sentPacketHistory struct {

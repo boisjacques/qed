@@ -3,8 +3,8 @@ package handshake
 import (
 	"time"
 
-	"github.com/lucas-clemente/quic-go/internal/protocol"
-	"github.com/lucas-clemente/quic-go/internal/utils"
+	"github.com/boisjacques/qed/internal/protocol"
+	"github.com/boisjacques/qed/internal/utils"
 	"github.com/marten-seemann/qtls"
 
 	. "github.com/onsi/ginkgo"
