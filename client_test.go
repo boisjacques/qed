@@ -311,7 +311,7 @@ var _ = Describe("Client", func() {
 		It("removes closed sessions from the multiplexer", func() {
 			manager := NewMockPacketHandlerManager(mockCtrl)
 			manager.EXPECT().Add(connID, gomock.Any())
-			manager.EXPECT().Remove(connID)
+			manager.EXPECT().Retire(connID)
 			mockMultiplexer.EXPECT().AddConn(packetConn, gomock.Any()).Return(manager, nil)
 
 			var runner sessionRunner

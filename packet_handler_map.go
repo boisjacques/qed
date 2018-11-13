@@ -51,11 +51,11 @@ func (h *packetHandlerMap) Add(id protocol.ConnectionID, handler packetHandler) 
 	h.mutex.Unlock()
 }
 
-func (h *packetHandlerMap) Remove(id protocol.ConnectionID) {
-	h.removeByConnectionIDAsString(string(id))
+func (h *packetHandlerMap) Retire(id protocol.ConnectionID) {
+	h.retireByConnectionIDAsString(string(id))
 }
 
-func (h *packetHandlerMap) removeByConnectionIDAsString(id string) {
+func (h *packetHandlerMap) retireByConnectionIDAsString(id string) {
 	h.mutex.Lock()
 	h.handlers[id] = nil
 	h.mutex.Unlock()
@@ -83,7 +83,7 @@ func (h *packetHandlerMap) CloseServer() {
 			go func(id string, handler packetHandler) {
 				// session.Close() blocks until the CONNECTION_CLOSE has been sent and the run-loop has stopped
 				_ = handler.Close()
-				h.removeByConnectionIDAsString(id)
+				h.retireByConnectionIDAsString(id)
 				wg.Done()
 			}(id, handler)
 		}

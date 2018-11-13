@@ -92,7 +92,7 @@ var _ = Describe("Packet Handler Map", func() {
 			handler.deleteClosedSessionsAfter = 10 * time.Millisecond
 			connID := protocol.ConnectionID{1, 2, 3, 4, 5, 6, 7, 8}
 			handler.Add(connID, NewMockPacketHandler(mockCtrl))
-			handler.Remove(connID)
+			handler.Retire(connID)
 			Eventually(func() error {
 				return handler.handlePacket(nil, getPacket(connID))
 			}).Should(MatchError("received a packet with an unexpected connection ID 0x0102030405060708"))
@@ -102,7 +102,7 @@ var _ = Describe("Packet Handler Map", func() {
 			handler.deleteClosedSessionsAfter = time.Hour
 			connID := protocol.ConnectionID{1, 2, 3, 4, 5, 6, 7, 8}
 			handler.Add(connID, NewMockPacketHandler(mockCtrl))
-			handler.Remove(connID)
+			handler.Retire(connID)
 			err := handler.handlePacket(nil, getPacket(connID))
 			Expect(err).ToNot(HaveOccurred())
 		})
