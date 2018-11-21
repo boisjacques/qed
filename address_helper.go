@@ -1,6 +1,7 @@
 package quic
 
 import (
+	"fmt"
 	"github.com/boisjacques/golang-utils"
 	"log"
 	"net"
@@ -59,7 +60,6 @@ func (a *AddressHelper) GatherAddresses() {
 		if !strings.Contains(flags, "loopback") {
 			addrs, _ := iface.Addrs()
 			for _, addr := range addrs {
-				//TODO: Fix link local addresses, add 169.254.0.0/16
 				if !isLinkLocal(addr.String()) {
 					if strings.Contains(addr.String(), ":") {
 
@@ -101,7 +101,7 @@ func (a *AddressHelper) openSocket(local net.Addr) (net.PacketConn, error) {
 	return usock, err
 }
 
-func (a *AddressHelper) cleanUp() {
+func (a *AddressHelper) cleanUp() error {
 	a.lockAddresses.Lock()
 	log.Println("locked: ", util.Tracer())
 	defer a.lockAddresses.Unlock()
@@ -110,10 +110,17 @@ func (a *AddressHelper) cleanUp() {
 		if value == false {
 			a.Publish(key)
 			time.Sleep(100 * time.Millisecond) //Wait 100 ms for handling in scheduler
+			if a.containsSocket(key) {
+				err := a.sockets[key].Close()
+				if err != nil {
+					fmt.Println(err)
+					return err
+				}
+			}
 			delete(a.ipAddresses, key)
-			a.sockets[key].Close()
 		}
 	}
+	return nil
 }
 
 func (a *AddressHelper) GetAddresses() *map[net.Addr]bool {

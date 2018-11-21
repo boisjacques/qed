@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"github.com/boisjacques/qed"
 	"math/rand"
+	"net"
 	"os"
 	"time"
 )
@@ -14,8 +15,24 @@ import (
 func main() {
 	var addr string
 	var path string
-	flag.StringVar(&addr, "addr", "localhost:4433", "address:port")
+	flag.StringVar(&addr, "addr", "", "address:port")
 	flag.StringVar(&path, "path", "", "/path/to/file")
+
+	if addr == "" {
+		interfaces, _ := net.Interfaces()
+		for _, iface := range interfaces {
+			if iface.Name == "en0" {
+				addrs, err := iface.Addrs()
+				if err != nil {
+					fmt.Println(err)
+					return
+				}
+				_addr := addrs[1].String()
+				min3 := len(_addr) - 3
+				addr = _addr[:min3]+ ":4433"
+			}
+		}
+	}
 
 	var message []byte
 
@@ -30,7 +47,8 @@ func main() {
 		message = make([]byte, 0)
 		f.Read(message)
 	} else {
-		messageLen := 100 * 1e6
+		var messageLen uint64
+		messageLen = 100 * 1e6
 		message = make([]byte, messageLen)
 		rand.Seed(time.Now().UnixNano())
 		rand.Read(message)
@@ -38,11 +56,13 @@ func main() {
 
 	session, err := quic.DialAddr(addr, &tls.Config{InsecureSkipVerify: true}, nil)
 	if err != nil {
+		println(err.Error())
 		return
 	}
 
 	stream, err := session.OpenStreamSync()
 	if err != nil {
+		println(err.Error())
 		return
 	}
 	hasher := sha256.New()

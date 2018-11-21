@@ -17,7 +17,7 @@ import (
 func main() {
 	var addr string
 	var path string
-	flag.StringVar(&addr, "addr", "localhost:4433", "address:port")
+	flag.StringVar(&addr, "addr", ":4433", "address:port")
 	flag.StringVar(&path, "path", "out.file", "/path/to/file")
 	listener, err := quic.ListenAddr(addr, generateTLSConfig(), nil)
 

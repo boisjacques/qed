@@ -3,3 +3,7 @@ debug.test
 main
 
 \.idea/
+
+example/bin/server/out\.file
+
+out\.file
