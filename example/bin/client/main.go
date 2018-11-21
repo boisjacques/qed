@@ -18,6 +18,8 @@ func main() {
 	flag.StringVar(&addr, "addr", "", "address:port")
 	flag.StringVar(&path, "path", "", "/path/to/file")
 
+	flag.Parse()
+
 	if addr == "" {
 		interfaces, _ := net.Interfaces()
 		for _, iface := range interfaces {
