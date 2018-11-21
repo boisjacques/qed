@@ -32,7 +32,7 @@ func (c *mockPacketConn) ReadFrom(b []byte) (int, net.Addr, error) {
 	}
 	data, ok := <-c.dataToRead
 	if !ok {
-		return 0, nil, errors.New("connection closed")
+		return 0, nil, errors.New("Connection closed")
 	}
 	n := copy(b, data)
 	return n, c.dataReadFrom, nil
@@ -56,7 +56,7 @@ func (c *mockPacketConn) SetWriteDeadline(t time.Time) error { panic("not implem
 var _ net.PacketConn = &mockPacketConn{}
 
 var _ = Describe("Connection", func() {
-	var c *conn
+	var c *Conn
 	var packetConn *mockPacketConn
 
 	BeforeEach(func() {
@@ -65,7 +65,7 @@ var _ = Describe("Connection", func() {
 			Port: 1337,
 		}
 		packetConn = newMockPacketConn()
-		c = &conn{
+		c = &Conn{
 			currentAddr: addr,
 			pconn:       packetConn,
 		}

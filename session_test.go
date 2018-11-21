@@ -231,7 +231,7 @@ var _ = Describe("Session", func() {
 				Expect(err).ToNot(HaveOccurred())
 			})
 
-			It("updates the flow control window of the connection", func() {
+			It("updates the flow control window of the Connection", func() {
 				offset := protocol.ByteCount(0x800000)
 				connFC.EXPECT().UpdateSendWindow(offset)
 				sess.handleMaxDataFrame(&wire.MaxDataFrame{ByteOffset: offset})
@@ -369,11 +369,11 @@ var _ = Describe("Session", func() {
 			streamManager.EXPECT().CloseWithError(qerr.Error(qerr.PeerGoingAway, ""))
 			sessionRunner.EXPECT().removeConnectionID(gomock.Any())
 			cryptoSetup.EXPECT().Close()
-			packer.EXPECT().PackConnectionClose(gomock.Any()).Return(&packedPacket{raw: []byte("connection close")}, nil)
+			packer.EXPECT().PackConnectionClose(gomock.Any()).Return(&packedPacket{raw: []byte("Connection close")}, nil)
 			Expect(sess.Close()).To(Succeed())
 			Eventually(areSessionsRunning).Should(BeFalse())
 			Expect(mconn.written).To(HaveLen(1))
-			Expect(mconn.written).To(Receive(ContainSubstring("connection close")))
+			Expect(mconn.written).To(Receive(ContainSubstring("Connection close")))
 			Expect(sess.Context().Done()).To(BeClosed())
 		})
 
@@ -514,8 +514,8 @@ var _ = Describe("Session", func() {
 			Expect(err).ToNot(HaveOccurred())
 		})
 
-		It("ignores packets with a different source connection ID", func() {
-			// Send one packet, which might change the connection ID.
+		It("ignores packets with a different source Connection ID", func() {
+			// Send one packet, which might change the Connection ID.
 			// only EXPECT one call to the unpacker
 			unpacker.EXPECT().Unpack(gomock.Any(), gomock.Any(), gomock.Any()).Return(&unpackedPacket{}, nil)
 			err := sess.handlePacketImpl(&receivedPacket{
@@ -526,7 +526,7 @@ var _ = Describe("Session", func() {
 				},
 			})
 			Expect(err).ToNot(HaveOccurred())
-			// The next packet has to be ignored, since the source connection ID doesn't match.
+			// The next packet has to be ignored, since the source Connection ID doesn't match.
 			err = sess.handlePacketImpl(&receivedPacket{
 				header: &wire.Header{
 					IsLongHeader:     true,
@@ -538,7 +538,7 @@ var _ = Describe("Session", func() {
 		})
 
 		Context("updating the remote address", func() {
-			It("doesn't support connection migration", func() {
+			It("doesn't support Connection migration", func() {
 				unpacker.EXPECT().Unpack(gomock.Any(), gomock.Any(), gomock.Any()).Return(&unpackedPacket{}, nil)
 				origAddr := sess.conn.(*mockConnection).remoteAddr
 				remoteIP := &net.IPAddr{IP: net.IPv4(192, 168, 0, 100)}
@@ -592,7 +592,7 @@ var _ = Describe("Session", func() {
 			Expect(sess.sendPackets()).To(Succeed())
 		})
 
-		It("adds a BLOCKED frame when it is connection-level flow control blocked", func() {
+		It("adds a BLOCKED frame when it is Connection-level flow control blocked", func() {
 			fc := mocks.NewMockConnectionFlowController(mockCtrl)
 			fc.EXPECT().IsNewlyBlocked().Return(true, protocol.ByteCount(1337))
 			packer.EXPECT().PackPacket().Return(getPacket(1), nil)
@@ -1307,7 +1307,7 @@ var _ = Describe("Client Session", func() {
 		sess.cryptoStreamHandler = cryptoSetup
 	})
 
-	It("changes the connection ID when receiving the first packet from the server", func() {
+	It("changes the Connection ID when receiving the first packet from the server", func() {
 		unpacker := NewMockUnpacker(mockCtrl)
 		unpacker.EXPECT().Unpack(gomock.Any(), gomock.Any(), gomock.Any()).Return(&unpackedPacket{}, nil)
 		sess.unpacker = unpacker

@@ -74,7 +74,7 @@ type session struct {
 	version     protocol.VersionNumber
 	config      *Config
 
-	conn connection
+	scheduler *Scheduler
 
 	streamsMap streamManager
 
@@ -133,7 +133,6 @@ var _ Session = &session{}
 var _ streamSender = &session{}
 
 var newSession = func(
-	conn connection,
 	runner sessionRunner,
 	clientDestConnID protocol.ConnectionID,
 	destConnID protocol.ConnectionID,
@@ -145,7 +144,7 @@ var newSession = func(
 	v protocol.VersionNumber,
 ) (quicSession, error) {
 	s := &session{
-		conn:                  conn,
+		scheduler:             nil,
 		sessionRunner:         runner,
 		config:                conf,
 		srcConnID:             srcConnID,
@@ -190,7 +189,7 @@ var newSession = func(
 		initialStream,
 		handshakeStream,
 		s.sentPacketHandler,
-		s.RemoteAddr(),
+		// s.RemoteAddr(),
 		nil, // no token
 		cs,
 		s.framer,
@@ -209,7 +208,6 @@ var newSession = func(
 
 // declare this as a variable, such that we can it mock it in the tests
 var newClientSession = func(
-	conn connection,
 	runner sessionRunner,
 	token []byte,
 	origDestConnID protocol.ConnectionID,
@@ -223,7 +221,7 @@ var newClientSession = func(
 	v protocol.VersionNumber,
 ) (quicSession, error) {
 	s := &session{
-		conn:                  conn,
+		scheduler:             nil,
 		sessionRunner:         runner,
 		config:                conf,
 		srcConnID:             srcConnID,
@@ -272,7 +270,7 @@ var newClientSession = func(
 		initialStream,
 		handshakeStream,
 		s.sentPacketHandler,
-		s.RemoteAddr(),
+		// s.RemoteAddr(),
 		token,
 		cs,
 		s.framer,
@@ -390,7 +388,7 @@ runLoop:
 		}
 		if s.config.KeepAlive && !s.keepAlivePingSent && s.handshakeComplete && time.Since(s.lastNetworkActivityTime) >= s.peerParams.IdleTimeout/2 {
 			// send a PING frame since there is no activity in the session
-			s.logger.Debugf("Sending a keep-alive ping to keep the connection alive.")
+			s.logger.Debugf("Sending a keep-alive ping to keep the Connection alive.")
 			s.framer.QueueControlFrame(&wire.PingFrame{})
 			s.keepAlivePingSent = true
 		} else if !pacingDeadline.IsZero() && now.Before(pacingDeadline) {
@@ -476,10 +474,10 @@ func (s *session) handleHandshakeComplete() {
 
 func (s *session) handlePacketImpl(p *receivedPacket) error {
 	hdr := p.header
-	// The server can change the source connection ID with the first Handshake packet.
-	// After this, all packets with a different source connection have to be ignored.
+	// The server can change the source Connection ID with the first Handshake packet.
+	// After this, all packets with a different source Connection have to be ignored.
 	if s.receivedFirstPacket && hdr.IsLongHeader && !hdr.SrcConnectionID.Equal(s.destConnID) {
-		s.logger.Debugf("Dropping packet with unexpected source connection ID: %s (expected %s)", p.header.SrcConnectionID, s.destConnID)
+		s.logger.Debugf("Dropping packet with unexpected source Connection ID: %s (expected %s)", p.header.SrcConnectionID, s.destConnID)
 		return nil
 	}
 
@@ -499,9 +497,9 @@ func (s *session) handlePacketImpl(p *receivedPacket) error {
 	packet, err := s.unpacker.Unpack(hdr.Raw, hdr, p.data)
 	if s.logger.Debug() {
 		if err != nil {
-			s.logger.Debugf("<- Reading packet 0x%x (%d bytes) for connection %s", hdr.PacketNumber, len(p.data)+len(hdr.Raw), hdr.DestConnectionID)
+			s.logger.Debugf("<- Reading packet 0x%x (%d bytes) for Connection %s", hdr.PacketNumber, len(p.data)+len(hdr.Raw), hdr.DestConnectionID)
 		} else {
-			s.logger.Debugf("<- Reading packet 0x%x (%d bytes) for connection %s, %s", hdr.PacketNumber, len(p.data)+len(hdr.Raw), hdr.DestConnectionID, packet.encryptionLevel)
+			s.logger.Debugf("<- Reading packet 0x%x (%d bytes) for Connection %s, %s", hdr.PacketNumber, len(p.data)+len(hdr.Raw), hdr.DestConnectionID, packet.encryptionLevel)
 		}
 		hdr.Log(s.logger)
 	}
@@ -510,9 +508,9 @@ func (s *session) handlePacketImpl(p *receivedPacket) error {
 		return err
 	}
 
-	// The server can change the source connection ID with the first Handshake packet.
+	// The server can change the source Connection ID with the first Handshake packet.
 	if s.perspective == protocol.PerspectiveClient && !s.receivedFirstPacket && hdr.IsLongHeader && !hdr.SrcConnectionID.Equal(s.destConnID) {
-		s.logger.Debugf("Received first packet. Switching destination connection ID to: %s", hdr.SrcConnectionID)
+		s.logger.Debugf("Received first packet. Switching destination Connection ID to: %s", hdr.SrcConnectionID)
 		s.destConnID = hdr.SrcConnectionID
 		s.packer.ChangeDestConnectionID(s.destConnID)
 	}
@@ -579,6 +577,12 @@ func (s *session) handleFrames(fs []wire.Frame, encLevel protocol.EncryptionLeve
 			// since we don't send PATH_CHALLENGEs, we don't expect PATH_RESPONSEs
 			err = errors.New("unexpected PATH_RESPONSE frame")
 		case *wire.NewTokenFrame:
+		case *wire.AddrModFrame:
+			s.handleAddressModificationFrame(frame)
+		case *wire.OwdFrame:
+			s.handleOneWayDelayFrame(frame)
+		case *wire.OwdAckFrame:
+			s.handleOneWayDelayAckFrame(frame)
 		default:
 			return errors.New("Session BUG: unexpected frame type")
 		}
@@ -685,6 +689,31 @@ func (s *session) handleAckFrame(frame *wire.AckFrame, encLevel protocol.Encrypt
 	return nil
 }
 
+func (s *session) handleAddressModificationFrame(frame *wire.AddrModFrame) error {
+	if frame.Operation() == 0x0 {
+		s.scheduler.removeAddress(frame.Address())
+	} else {
+		remote, err := net.ResolveUDPAddr("udp", frame.Address().String())
+		if err != nil {
+			return err
+		}
+		s.scheduler.addRemoteAddress(remote)
+	}
+	return nil
+}
+
+func (s *session) handleOneWayDelayFrame(frame *wire.OwdFrame) error {
+	owd := time.Now().UnixNano() - frame.Time()
+	f := wire.NewOwdAckFrame(frame.PathID(), owd)
+	s.queueControlFrame(f)
+	return nil
+}
+
+func (s *session) handleOneWayDelayAckFrame(frame *wire.OwdAckFrame) error {
+	s.scheduler.setOwd(frame.PathID(), frame.Owd())
+	return nil
+}
+
 // closeLocal closes the session and send a CONNECTION_CLOSE containing the error
 func (s *session) closeLocal(e error) {
 	s.closeOnce.Do(func() {
@@ -705,7 +734,7 @@ func (s *session) closeRemote(e error) {
 	})
 }
 
-// Close the connection. It sends a qerr.PeerGoingAway.
+// Close the Connection. It sends a qerr.PeerGoingAway.
 // It waits until the run loop has stopped before returning
 func (s *session) Close() error {
 	s.closeLocal(nil)
@@ -731,7 +760,7 @@ func (s *session) handleCloseError(closeErr closeError) error {
 	}
 	// Don't log 'normal' reasons
 	if quicErr.ErrorCode == qerr.PeerGoingAway || quicErr.ErrorCode == qerr.NetworkIdleTimeout {
-		s.logger.Infof("Closing connection %s.", s.srcConnID)
+		s.logger.Infof("Closing Connection %s.", s.srcConnID)
 	} else {
 		s.logger.Errorf("Closing session with error: %s", closeErr.err.Error())
 	}
@@ -909,6 +938,7 @@ func (s *session) sendProbePacket() error {
 }
 
 func (s *session) sendPacket() (bool, error) {
+	//TODO: Put scheduler here
 	if isBlocked, offset := s.connFlowController.IsNewlyBlocked(); isBlocked {
 		s.framer.QueueControlFrame(&wire.DataBlockedFrame{DataLimit: offset})
 	}
@@ -928,7 +958,7 @@ func (s *session) sendPacket() (bool, error) {
 func (s *session) sendPackedPacket(packet *packedPacket) error {
 	defer putPacketBuffer(&packet.raw)
 	s.logPacket(packet)
-	return s.conn.Write(packet.raw)
+	return s.scheduler.Send(packet.raw)
 }
 
 func (s *session) sendConnectionClose(quicErr *qerr.QuicError) error {
@@ -940,7 +970,7 @@ func (s *session) sendConnectionClose(quicErr *qerr.QuicError) error {
 		return err
 	}
 	s.logPacket(packet)
-	return s.conn.Write(packet.raw)
+	return s.scheduler.Send(packet.raw)
 }
 
 func (s *session) logPacket(packet *packedPacket) {
@@ -948,7 +978,7 @@ func (s *session) logPacket(packet *packedPacket) {
 		// We don't need to allocate the slices for calling the format functions
 		return
 	}
-	s.logger.Debugf("-> Sending packet 0x%x (%d bytes) for connection %s, %s", packet.header.PacketNumber, len(packet.raw), s.srcConnID, packet.encryptionLevel)
+	s.logger.Debugf("-> Sending packet 0x%x (%d bytes) for Connection %s, %s", packet.header.PacketNumber, len(packet.raw), s.srcConnID, packet.encryptionLevel)
 	packet.header.Log(s.logger)
 	for _, frame := range packet.frames {
 		wire.LogFrame(s.logger, frame, true)
@@ -1059,6 +1089,10 @@ func (s *session) queueControlFrame(f wire.Frame) {
 	s.scheduleSending()
 }
 
+func (s *session) QueueQedFrame(f wire.Frame) {
+	s.queueControlFrame(f)
+}
+
 func (s *session) onHasStreamWindowUpdate(id protocol.StreamID) {
 	s.windowUpdateQueue.AddStream(id)
 	s.scheduleSending()
@@ -1081,13 +1115,22 @@ func (s *session) onStreamCompleted(id protocol.StreamID) {
 }
 
 func (s *session) LocalAddr() net.Addr {
-	return s.conn.LocalAddr()
+	return s.scheduler.GetPathZero().GetConn().LocalAddr()
 }
 
 func (s *session) RemoteAddr() net.Addr {
-	return s.conn.RemoteAddr()
+	return s.scheduler.GetPathZero().GetConn().RemoteAddr()
 }
 
 func (s *session) GetVersion() protocol.VersionNumber {
 	return s.version
+}
+
+func (s *session) GetPathZeroConn() *Conn {
+	return s.scheduler.GetPathZero().GetConn()
+}
+
+// Part of QED implementation
+func (s *session) AddScheduler(scheduler *Scheduler) {
+	s.scheduler = scheduler
 }

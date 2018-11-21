@@ -120,7 +120,7 @@ var _ = Describe("Packet packer", func() {
 			Expect(h.Version).To(Equal(packer.version))
 		})
 
-		It("sets source and destination connection ID", func() {
+		It("sets source and destination Connection ID", func() {
 			pnManager.EXPECT().PeekPacketNumber().Return(protocol.PacketNumber(0x42), protocol.PacketNumberLen2)
 			srcConnID := protocol.ConnectionID{1, 2, 3, 4, 5, 6, 7, 8}
 			destConnID := protocol.ConnectionID{8, 7, 6, 5, 4, 3, 2, 1}
@@ -131,7 +131,7 @@ var _ = Describe("Packet packer", func() {
 			Expect(h.DestConnectionID).To(Equal(destConnID))
 		})
 
-		It("changes the destination connection ID", func() {
+		It("changes the destination Connection ID", func() {
 			pnManager.EXPECT().PeekPacketNumber().Return(protocol.PacketNumber(0x42), protocol.PacketNumberLen2).Times(2)
 			srcConnID := protocol.ConnectionID{1, 1, 1, 1, 1, 1, 1, 1}
 			packer.srcConnID = srcConnID

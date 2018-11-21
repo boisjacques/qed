@@ -5,7 +5,7 @@ import (
 	"sync"
 )
 
-type connection interface {
+type Connection interface {
 	Write([]byte) error
 	Read([]byte) (int, net.Addr, error)
 	Close() error
@@ -14,41 +14,53 @@ type connection interface {
 	SetCurrentRemoteAddr(net.Addr)
 }
 
-type conn struct {
+type Conn struct {
 	mutex sync.RWMutex
 
 	pconn       net.PacketConn
 	currentAddr net.Addr
 }
 
-var _ connection = &conn{}
+func NewConn(pconn net.PacketConn, remote net.Addr) *Conn {
+	return &Conn{pconn: pconn, currentAddr: remote}
+}
 
-func (c *conn) Write(p []byte) error {
+var _ Connection = &Conn{}
+
+func (c *Conn) Write(p []byte) error {
 	_, err := c.pconn.WriteTo(p, c.currentAddr)
 	return err
 }
 
-func (c *conn) Read(p []byte) (int, net.Addr, error) {
+func (c *Conn) Read(p []byte) (int, net.Addr, error) {
 	return c.pconn.ReadFrom(p)
 }
 
-func (c *conn) SetCurrentRemoteAddr(addr net.Addr) {
+func (c *Conn) SetCurrentRemoteAddr(addr net.Addr) {
 	c.mutex.Lock()
 	c.currentAddr = addr
 	c.mutex.Unlock()
 }
 
-func (c *conn) LocalAddr() net.Addr {
+func (c *Conn) LocalAddr() net.Addr {
 	return c.pconn.LocalAddr()
 }
 
-func (c *conn) RemoteAddr() net.Addr {
+func (c *Conn) RemoteAddr() net.Addr {
 	c.mutex.RLock()
 	addr := c.currentAddr
 	c.mutex.RUnlock()
 	return addr
 }
 
-func (c *conn) Close() error {
+func (c *Conn) Close() error {
 	return c.pconn.Close()
+}
+
+func (c *Conn) GetLocal() net.Addr {
+	return c.pconn.LocalAddr()
+}
+
+func (c *Conn) GetRemote() net.Addr {
+	return c.RemoteAddr()
 }

@@ -107,7 +107,7 @@ var _ = Describe("Server", func() {
 			return hdr
 		}
 
-		It("drops Initial packets with a too short connection ID", func() {
+		It("drops Initial packets with a too short Connection ID", func() {
 			serv.handlePacket(&receivedPacket{
 				header: &wire.Header{
 					IsLongHeader:     true,
@@ -132,7 +132,7 @@ var _ = Describe("Server", func() {
 			Expect(conn.dataWritten.Len()).To(BeZero())
 		})
 
-		It("drops packets with a too short connection ID", func() {
+		It("drops packets with a too short Connection ID", func() {
 			hdr := &wire.Header{
 				SrcConnectionID:  protocol.ConnectionID{1, 2, 3, 4, 5, 6, 7, 8},
 				DestConnectionID: protocol.ConnectionID{1, 2, 3, 4},
@@ -257,7 +257,7 @@ var _ = Describe("Server", func() {
 			}
 			run := make(chan struct{})
 			serv.newSession = func(
-				_ connection,
+				_ Connection,
 				_ sessionRunner,
 				origConnID protocol.ConnectionID,
 				destConnID protocol.ConnectionID,
@@ -270,7 +270,7 @@ var _ = Describe("Server", func() {
 			) (quicSession, error) {
 				Expect(origConnID).To(Equal(hdr.DestConnectionID))
 				Expect(destConnID).To(Equal(hdr.SrcConnectionID))
-				// make sure we're using a server-generated connection ID
+				// make sure we're using a server-generated Connection ID
 				Expect(srcConnID).ToNot(Equal(hdr.DestConnectionID))
 				Expect(srcConnID).ToNot(Equal(hdr.SrcConnectionID))
 				sess := NewMockQuicSession(mockCtrl)
@@ -287,7 +287,7 @@ var _ = Describe("Server", func() {
 				Expect(conn.dataWritten.Len()).To(BeZero())
 				close(done)
 			}()
-			// make sure we're using a server-generated connection ID
+			// make sure we're using a server-generated Connection ID
 			Eventually(run).Should(BeClosed())
 			Eventually(done).Should(BeClosed())
 		})
@@ -340,7 +340,7 @@ var _ = Describe("Server", func() {
 
 			completeHandshake := make(chan struct{})
 			serv.newSession = func(
-				_ connection,
+				_ Connection,
 				runner sessionRunner,
 				_ protocol.ConnectionID,
 				_ protocol.ConnectionID,

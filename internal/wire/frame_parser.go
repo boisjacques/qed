@@ -58,14 +58,20 @@ func parseFrame(r *bytes.Reader, typeByte byte, v protocol.VersionNumber) (Frame
 		frame, err = parseStreamDataBlockedFrame(r, v)
 	case 0x16, 0x17:
 		frame, err = parseStreamsBlockedFrame(r, v)
-	// TODO: implement NEW_CONNECTION_ID frame
-	// TODO: implement RETIRE_CONNECTION_ID frame
+		// TODO: implement NEW_CONNECTION_ID frame
+		// TODO: implement RETIRE_CONNECTION_ID frame
 	case 0x1a:
 		frame, err = parsePathChallengeFrame(r, v)
 	case 0x1b:
 		frame, err = parsePathResponseFrame(r, v)
 	case 0x1c, 0x1d:
 		frame, err = parseConnectionCloseFrame(r, v)
+	case 0xf1:
+		frame, err = parseAddrModFrame(r, v)
+	case 0xf2:
+		frame, err = parseOwdFrame(r, v)
+	case 0xf3:
+		frame, err = parseOwdAckFrame(r, v)
 	default:
 		err = fmt.Errorf("unknown type byte 0x%x", typeByte)
 	}

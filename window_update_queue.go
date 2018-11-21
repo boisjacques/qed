@@ -12,7 +12,7 @@ type windowUpdateQueue struct {
 	mutex sync.Mutex
 
 	queue      map[protocol.StreamID]bool // used as a set
-	queuedConn bool                       // connection-level window update
+	queuedConn bool                       // Connection-level window update
 
 	streamGetter       streamGetter
 	connFlowController flowcontrol.ConnectionFlowController
@@ -46,7 +46,7 @@ func (q *windowUpdateQueue) AddConnection() {
 
 func (q *windowUpdateQueue) QueueAll() {
 	q.mutex.Lock()
-	// queue a connection-level window update
+	// queue a Connection-level window update
 	if q.queuedConn {
 		q.callback(&wire.MaxDataFrame{ByteOffset: q.connFlowController.GetWindowUpdate()})
 		q.queuedConn = false

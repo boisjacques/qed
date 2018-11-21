@@ -69,8 +69,8 @@ type server struct {
 	config  *Config
 
 	conn net.PacketConn
-	// If the server is started with ListenAddr, we create a packet conn.
-	// If it is started with Listen, we take a packet conn as a parameter.
+	// If the server is started with ListenAddr, we create a packet Conn.
+	// If it is started with Listen, we take a packet Conn as a parameter.
 	createdPacketConn bool
 
 	cookieGenerator *handshake.CookieGenerator
@@ -78,7 +78,7 @@ type server struct {
 	sessionHandler packetHandlerManager
 
 	// set as a member, so they can be set in the tests
-	newSession func(connection, sessionRunner, protocol.ConnectionID /* original connection ID */, protocol.ConnectionID /* destination connection ID */, protocol.ConnectionID /* source connection ID */, *Config, *tls.Config, *handshake.TransportParameters, utils.Logger, protocol.VersionNumber) (quicSession, error)
+	newSession func(sessionRunner, protocol.ConnectionID /* original Connection ID */, protocol.ConnectionID /* destination Connection ID */, protocol.ConnectionID /* source Connection ID */, *Config, *tls.Config, *handshake.TransportParameters, utils.Logger, protocol.VersionNumber) (quicSession, error)
 
 	serverError error
 	errorChan   chan struct{}
@@ -269,8 +269,8 @@ func (s *server) closeWithMutex() error {
 		s.serverError = errors.New("server closed")
 	}
 	var err error
-	// If the server was started with ListenAddr, we created the packet conn.
-	// We need to close it in order to make the go routine reading from that conn return.
+	// If the server was started with ListenAddr, we created the packet Conn.
+	// We need to close it in order to make the go routine reading from that Conn return.
 	if s.createdPacketConn {
 		err = s.conn.Close()
 	}
@@ -334,7 +334,7 @@ func (s *server) handleInitial(p *receivedPacket) {
 func (s *server) handleInitialImpl(p *receivedPacket) (quicSession, protocol.ConnectionID, error) {
 	hdr := p.header
 	if len(hdr.Token) == 0 && hdr.DestConnectionID.Len() < protocol.MinConnectionIDLenInitial {
-		return nil, nil, errors.New("dropping Initial packet with too short connection ID")
+		return nil, nil, errors.New("dropping Initial packet with too short Connection ID")
 	}
 	if len(hdr.Raw)+len(p.data) < protocol.MinInitialPacketSize {
 		return nil, nil, errors.New("dropping too small Initial packet")
@@ -363,7 +363,7 @@ func (s *server) handleInitialImpl(p *receivedPacket) (quicSession, protocol.Con
 	if err != nil {
 		return nil, nil, err
 	}
-	s.logger.Debugf("Changing connection ID to %s.", connID)
+	s.logger.Debugf("Changing Connection ID to %s.", connID)
 	sess, err := s.createNewSession(
 		p.remoteAddr,
 		origDestConnectionID,
@@ -401,7 +401,6 @@ func (s *server) createNewSession(
 		OriginalConnectionID: origDestConnID,
 	}
 	sess, err := s.newSession(
-		&conn{pconn: s.conn, currentAddr: remoteAddr},
 		s.sessionRunner,
 		clientDestConnID,
 		destConnID,
@@ -412,6 +411,7 @@ func (s *server) createNewSession(
 		s.logger,
 		version,
 	)
+	sess.(*session).AddScheduler(NewScheduler(sess.(*session), s.conn, remoteAddr))
 	if err != nil {
 		return nil, err
 	}
@@ -437,7 +437,7 @@ func (s *server) sendRetry(remoteAddr net.Addr, hdr *wire.Header) error {
 		OrigDestConnectionID: hdr.DestConnectionID,
 		Token:                token,
 	}
-	s.logger.Debugf("Changing connection ID to %s.\n-> Sending Retry", connID)
+	s.logger.Debugf("Changing Connection ID to %s.\n-> Sending Retry", connID)
 	replyHdr.Log(s.logger)
 	buf := &bytes.Buffer{}
 	if err := replyHdr.Write(buf, protocol.PerspectiveServer, hdr.Version); err != nil {

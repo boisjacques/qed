@@ -164,7 +164,7 @@ func (s *sendStream) popStreamFrameImpl(maxBytes protocol.ByteCount) (bool /* co
 		// this can happen if:
 		// - popStreamFrame is called but there's no data for writing
 		// - there's data for writing, but the stream is stream-level flow control blocked
-		// - there's data for writing, but the stream is connection-level flow control blocked
+		// - there's data for writing, but the stream is Connection-level flow control blocked
 		if s.dataForWriting == nil {
 			return false, nil, false
 		}

@@ -22,7 +22,7 @@ type Cookie struct {
 	SentTime   time.Time
 }
 
-// ConnectionState records basic details about the QUIC connection.
+// ConnectionState records basic details about the QUIC Connection.
 type ConnectionState = handshake.ConnectionState
 
 // An ErrorCode is an application-defined error code.
@@ -73,7 +73,7 @@ type Stream interface {
 	// A zero value for t means Write will not time out.
 	SetWriteDeadline(t time.Time) error
 	// SetDeadline sets the read and write deadlines associated
-	// with the connection. It is equivalent to calling both
+	// with the Connection. It is equivalent to calling both
 	// SetReadDeadline and SetWriteDeadline.
 	SetDeadline(t time.Time) error
 }
@@ -113,7 +113,7 @@ type StreamError interface {
 	ErrorCode() ErrorCode
 }
 
-// A Session is a QUIC connection between two peers.
+// A Session is a QUIC Connection between two peers.
 type Session interface {
 	// AcceptStream returns the next stream opened by the peer, blocking until one is available.
 	AcceptStream() (Stream, error)
@@ -139,15 +139,15 @@ type Session interface {
 	LocalAddr() net.Addr
 	// RemoteAddr returns the address of the peer.
 	RemoteAddr() net.Addr
-	// Close the connection.
+	// Close the Connection.
 	io.Closer
-	// Close the connection with an error.
+	// Close the Connection with an error.
 	// The error must not be nil.
 	CloseWithError(ErrorCode, error) error
 	// The context is cancelled when the session is closed.
 	// Warning: This API should not be considered stable and might change soon.
 	Context() context.Context
-	// ConnectionState returns basic details about the QUIC connection.
+	// ConnectionState returns basic details about the QUIC Connection.
 	// Warning: This API should not be considered stable and might change soon.
 	ConnectionState() ConnectionState
 }
@@ -158,20 +158,20 @@ type Config struct {
 	// If not set, it uses all versions available.
 	// Warning: This API should not be considered stable and will change soon.
 	Versions []VersionNumber
-	// The length of the connection ID in bytes.
+	// The length of the Connection ID in bytes.
 	// It can be 0, or any value between 4 and 18.
 	// If not set, the interpretation depends on where the Config is used:
-	// If used for dialing an address, a 0 byte connection ID will be used.
-	// If used for a server, or dialing on a packet conn, a 4 byte connection ID will be used.
-	// When dialing on a packet conn, the ConnectionIDLength value must be the same for every Dial call.
+	// If used for dialing an address, a 0 byte Connection ID will be used.
+	// If used for a server, or dialing on a packet Conn, a 4 byte Connection ID will be used.
+	// When dialing on a packet Conn, the ConnectionIDLength value must be the same for every Dial call.
 	ConnectionIDLength int
 	// HandshakeTimeout is the maximum duration that the cryptographic handshake may take.
-	// If the timeout is exceeded, the connection is closed.
+	// If the timeout is exceeded, the Connection is closed.
 	// If this value is zero, the timeout is set to 10 seconds.
 	HandshakeTimeout time.Duration
 	// IdleTimeout is the maximum duration that may pass without any incoming network activity.
 	// This value only applies after the handshake has completed.
-	// If the timeout is exceeded, the connection is closed.
+	// If the timeout is exceeded, the Connection is closed.
 	// If this value is zero, the timeout is set to 30 seconds.
 	IdleTimeout time.Duration
 	// AcceptCookie determines if a Cookie is accepted.
@@ -182,7 +182,7 @@ type Config struct {
 	// MaxReceiveStreamFlowControlWindow is the maximum stream-level flow control window for receiving data.
 	// If this value is zero, it will default to 1 MB for the server and 6 MB for the client.
 	MaxReceiveStreamFlowControlWindow uint64
-	// MaxReceiveConnectionFlowControlWindow is the connection-level flow control window for receiving data.
+	// MaxReceiveConnectionFlowControlWindow is the Connection-level flow control window for receiving data.
 	// If this value is zero, it will default to 1.5 MB for the server and 15 MB for the client.
 	MaxReceiveConnectionFlowControlWindow uint64
 	// MaxIncomingStreams is the maximum number of concurrent bidirectional streams that a peer is allowed to open.
@@ -193,7 +193,7 @@ type Config struct {
 	// If not set, it will default to 100.
 	// If set to a negative value, it doesn't allow any unidirectional streams.
 	MaxIncomingUniStreams int
-	// KeepAlive defines whether this peer will periodically send PING frames to keep the connection alive.
+	// KeepAlive defines whether this peer will periodically send PING frames to keep the Connection alive.
 	KeepAlive bool
 }
 

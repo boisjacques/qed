@@ -12,7 +12,7 @@ import (
 	"github.com/boisjacques/qed/internal/wire"
 )
 
-// The packetHandlerMap stores packetHandlers, identified by connection ID.
+// The packetHandlerMap stores packetHandlers, identified by Connection ID.
 // It is used:
 // * by the server to store sessions
 // * when multiplexing outgoing connections to store clients
@@ -162,7 +162,7 @@ func (h *packetHandlerMap) handlePacket(addr net.Addr, data []byte) error {
 	}
 	if !ok {
 		if server == nil { // no server set
-			return fmt.Errorf("received a packet with an unexpected connection ID %s", iHdr.DestConnectionID)
+			return fmt.Errorf("received a packet with an unexpected Connection ID %s", iHdr.DestConnectionID)
 		}
 		handlePacket = server.handlePacket
 		sentBy = protocol.PerspectiveClient

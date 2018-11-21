@@ -57,7 +57,7 @@ func (m *connMultiplexer) AddConn(c net.PacketConn, connIDLen int) (packetHandle
 		m.conns[c] = p
 	}
 	if p.connIDLen != connIDLen {
-		return nil, fmt.Errorf("cannot use %d byte connection IDs on a connection that is already using %d byte connction IDs", connIDLen, p.connIDLen)
+		return nil, fmt.Errorf("cannot use %d byte Connection IDs on a Connection that is already using %d byte connction IDs", connIDLen, p.connIDLen)
 	}
 	return p.manager, nil
 }

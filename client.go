@@ -18,9 +18,9 @@ import (
 type client struct {
 	mutex sync.Mutex
 
-	conn connection
-	// If the client is created with DialAddr, we create a packet conn.
-	// If it is started with Dial, we take a packet conn as a parameter.
+	// conn Connection
+	// If the client is created with DialAddr, we create a packet Conn.
+	// If it is started with Dial, we take a packet Conn as a parameter.
 	createdPacketConn bool
 
 	packetHandlers packetHandlerManager
@@ -36,7 +36,7 @@ type client struct {
 
 	srcConnID      protocol.ConnectionID
 	destConnID     protocol.ConnectionID
-	origDestConnID protocol.ConnectionID // the destination conn ID used on the first Initial (before a Retry)
+	origDestConnID protocol.ConnectionID // the destination Conn ID used on the first Initial (before a Retry)
 
 	initialVersion protocol.VersionNumber
 	version        protocol.VersionNumber
@@ -45,6 +45,8 @@ type client struct {
 	closeCallback func(protocol.ConnectionID)
 
 	session quicSession
+	pconn   net.PacketConn
+	remote  net.Addr
 
 	logger utils.Logger
 }
@@ -52,14 +54,14 @@ type client struct {
 var _ packetHandler = &client{}
 
 var (
-	// make it possible to mock connection ID generation in the tests
+	// make it possible to mock Connection ID generation in the tests
 	generateConnectionID           = protocol.GenerateConnectionID
 	generateConnectionIDForInitial = protocol.GenerateConnectionIDForInitial
 	errCloseSessionForNewVersion   = errors.New("closing session in order to recreate it with a new version")
 	errCloseSessionForRetry        = errors.New("closing session in response to a stateless retry")
 )
 
-// DialAddr establishes a new QUIC connection to a server.
+// DialAddr establishes a new QUIC Connection to a server.
 // The hostname for SNI is taken from the given address.
 func DialAddr(
 	addr string,
@@ -69,7 +71,7 @@ func DialAddr(
 	return DialAddrContext(context.Background(), addr, tlsConf, config)
 }
 
-// DialAddrContext establishes a new QUIC connection to a server using the provided context.
+// DialAddrContext establishes a new QUIC Connection to a server using the provided context.
 // The hostname for SNI is taken from the given address.
 func DialAddrContext(
 	ctx context.Context,
@@ -88,7 +90,7 @@ func DialAddrContext(
 	return dialContext(ctx, udpConn, udpAddr, addr, tlsConf, config, true)
 }
 
-// Dial establishes a new QUIC connection to a server using a net.PacketConn.
+// Dial establishes a new QUIC Connection to a server using a net.PacketConn.
 // The host parameter is used for SNI.
 func Dial(
 	pconn net.PacketConn,
@@ -100,7 +102,7 @@ func Dial(
 	return DialContext(context.Background(), pconn, remoteAddr, host, tlsConf, config)
 }
 
-// DialContext establishes a new QUIC connection to a server using a net.PacketConn using the provided context.
+// DialContext establishes a new QUIC Connection to a server using a net.PacketConn using the provided context.
 // The host parameter is used for SNI.
 func DialContext(
 	ctx context.Context,
@@ -171,7 +173,9 @@ func newClient(
 		onClose = closeCallback
 	}
 	c := &client{
-		conn:              &conn{pconn: pconn, currentAddr: remoteAddr},
+		//conn:            &Conn{pconn: pconn, currentAddr: remoteAddr},
+		pconn:             pconn,
+		remote:            remoteAddr,
 		createdPacketConn: createdPacketConn,
 		tlsConf:           tlsConf,
 		config:            config,
@@ -256,7 +260,7 @@ func (c *client) generateConnectionIDs() error {
 }
 
 func (c *client) dial(ctx context.Context) error {
-	c.logger.Infof("Starting new connection to %s (%s -> %s), source connection ID %s, destination connection ID %s, version %s", c.tlsConf.ServerName, c.conn.LocalAddr(), c.conn.RemoteAddr(), c.srcConnID, c.destConnID, c.version)
+	c.logger.Infof("Starting new Connection to %s (%s -> %s), source Connection ID %s, destination Connection ID %s, version %s", c.tlsConf.ServerName, c.pconn.LocalAddr(), c.remote, c.srcConnID, c.destConnID, c.version)
 
 	if err := c.createNewTLSSession(c.version); err != nil {
 		return err
@@ -268,19 +272,19 @@ func (c *client) dial(ctx context.Context) error {
 	return err
 }
 
-// establishSecureConnection runs the session, and tries to establish a secure connection
+// establishSecureConnection runs the session, and tries to establish a secure Connection
 // It returns:
 // - errCloseSessionForNewVersion when the server sends a version negotiation packet
 // - handshake.ErrCloseSessionForRetry when the server performs a stateless retry
 // - any other error that might occur
-// - when the connection is forward-secure
+// - when the Connection is forward-secure
 func (c *client) establishSecureConnection(ctx context.Context) error {
 	errorChan := make(chan error, 1)
 
 	go func() {
 		err := c.session.run() // returns as soon as the session is closed
 		if err != errCloseSessionForRetry && err != errCloseSessionForNewVersion && c.createdPacketConn {
-			c.conn.Close()
+			c.session.(*session).GetPathZeroConn().Close()
 		}
 		errorChan <- err
 	}()
@@ -318,9 +322,9 @@ func (c *client) handlePacketImpl(p *receivedPacket) error {
 		return err
 	}
 
-	// reject packets with the wrong connection ID
+	// reject packets with the wrong Connection ID
 	if !p.header.DestConnectionID.Equal(c.srcConnID) {
-		return fmt.Errorf("received a packet with an unexpected connection ID (%s, expected %s)", p.header.DestConnectionID, c.srcConnID)
+		return fmt.Errorf("received a packet with an unexpected Connection ID (%s, expected %s)", p.header.DestConnectionID, c.srcConnID)
 	}
 
 	if p.header.Type == protocol.PacketTypeRetry {
@@ -369,7 +373,7 @@ func (c *client) handleVersionNegotiationPacket(hdr *wire.Header) error {
 		return err
 	}
 
-	c.logger.Infof("Switching to QUIC version %s. New connection ID: %s", newVersion, c.destConnID)
+	c.logger.Infof("Switching to QUIC version %s. New Connection ID: %s", newVersion, c.destConnID)
 	c.session.destroy(errCloseSessionForNewVersion)
 	return nil
 }
@@ -416,7 +420,6 @@ func (c *client) createNewTLSSession(version protocol.VersionNumber) error {
 		removeConnectionIDImpl:  c.closeCallback,
 	}
 	sess, err := newClientSession(
-		c.conn,
 		runner,
 		c.token,
 		c.origDestConnID,
@@ -429,6 +432,7 @@ func (c *client) createNewTLSSession(version protocol.VersionNumber) error {
 		c.logger,
 		c.version,
 	)
+	sess.(*session).AddScheduler(NewScheduler(sess.(*session), c.pconn, c.remote))
 	if err != nil {
 		return err
 	}

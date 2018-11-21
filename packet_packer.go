@@ -108,7 +108,7 @@ func newPacketPacker(
 	initialStream cryptoStream,
 	handshakeStream cryptoStream,
 	packetNumberManager packetNumberManager,
-	remoteAddr net.Addr, // only used for determining the max packet size
+	// remoteAddr net.Addr, // only used for determining the max packet size
 	token []byte,
 	cryptoSetup sealingManager,
 	framer frameSource,
@@ -128,7 +128,7 @@ func newPacketPacker(
 		framer:          framer,
 		acks:            acks,
 		pnManager:       packetNumberManager,
-		maxPacketSize:   getMaxPacketSize(remoteAddr),
+		maxPacketSize:   protocol.MaxPacketSizeIPv6,
 	}
 }
 
@@ -257,6 +257,27 @@ func (p *packetPacker) packHandshakeRetransmission(packet *ackhandler.Packet) (*
 	header := p.getHeader(packet.EncryptionLevel)
 	header.Type = packet.PacketType
 	raw, err := p.writeAndSealPacket(header, packet.Frames, sealer)
+	return &packedPacket{
+		header:          header,
+		raw:             raw,
+		frames:          packet.Frames,
+		encryptionLevel: packet.EncryptionLevel,
+	}, err
+}
+
+// packQedPacket packs a packet containing a QED control frame
+// This is part of the QED extension
+func (p *packetPacker) packQedPacket(packet *Packet) (*packedPacket, error) {
+	sealer, err := p.cryptoSetup.GetSealerWithEncryptionLevel(packet.EncryptionLevel)
+	if err != nil {
+		return nil, err
+	}
+	header := p.getHeader(packet.EncryptionLevel)
+	header.Type = packet.PacketType
+	raw, err := p.writeAndSealPacket(header, packet.Frames, sealer)
+	if err != nil {
+		return nil, err
+	}
 	return &packedPacket{
 		header:          header,
 		raw:             raw,

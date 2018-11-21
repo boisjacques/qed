@@ -31,7 +31,7 @@ var _ = Describe("Client", func() {
 		origMultiplexer multiplexer
 
 		originalClientSessConstructor func(
-			conn connection,
+			conn Connection,
 			runner sessionRunner,
 			token []byte,
 			origDestConnID protocol.ConnectionID,
@@ -82,7 +82,7 @@ var _ = Describe("Client", func() {
 			srcConnID:  connID,
 			destConnID: connID,
 			version:    protocol.SupportedVersions[0],
-			conn:       &conn{pconn: packetConn, currentAddr: addr},
+			conn:       &Conn{pconn: packetConn, currentAddr: addr},
 			logger:     utils.DefaultLogger,
 		}
 		getMultiplexer() // make the sync.Once execute
@@ -135,7 +135,7 @@ var _ = Describe("Client", func() {
 
 			remoteAddrChan := make(chan string, 1)
 			newClientSession = func(
-				conn connection,
+				conn Connection,
 				_ sessionRunner,
 				_ []byte, // token
 				_ protocol.ConnectionID,
@@ -165,7 +165,7 @@ var _ = Describe("Client", func() {
 
 			hostnameChan := make(chan string, 1)
 			newClientSession = func(
-				_ connection,
+				_ Connection,
 				_ sessionRunner,
 				_ []byte, // token
 				_ protocol.ConnectionID,
@@ -195,7 +195,7 @@ var _ = Describe("Client", func() {
 
 			run := make(chan struct{})
 			newClientSession = func(
-				_ connection,
+				_ Connection,
 				runner sessionRunner,
 				_ []byte, // token
 				_ protocol.ConnectionID,
@@ -225,14 +225,14 @@ var _ = Describe("Client", func() {
 			Eventually(run).Should(BeClosed())
 		})
 
-		It("returns an error that occurs while waiting for the connection to become secure", func() {
+		It("returns an error that occurs while waiting for the Connection to become secure", func() {
 			manager := NewMockPacketHandlerManager(mockCtrl)
 			manager.EXPECT().Add(gomock.Any(), gomock.Any())
 			mockMultiplexer.EXPECT().AddConn(packetConn, gomock.Any()).Return(manager, nil)
 
 			testErr := errors.New("early handshake error")
 			newClientSession = func(
-				_ connection,
+				_ Connection,
 				_ sessionRunner,
 				_ []byte, // token
 				_ protocol.ConnectionID,
@@ -272,7 +272,7 @@ var _ = Describe("Client", func() {
 				<-sessionRunning
 			})
 			newClientSession = func(
-				_ connection,
+				_ Connection,
 				_ sessionRunner,
 				_ []byte, // token
 				_ protocol.ConnectionID,
@@ -317,7 +317,7 @@ var _ = Describe("Client", func() {
 			var runner sessionRunner
 			sess := NewMockQuicSession(mockCtrl)
 			newClientSession = func(
-				_ connection,
+				_ Connection,
 				runnerP sessionRunner,
 				_ []byte, // token
 				_ protocol.ConnectionID,
@@ -348,7 +348,7 @@ var _ = Describe("Client", func() {
 			Expect(err).ToNot(HaveOccurred())
 		})
 
-		It("closes the connection when it was created by DialAddr", func() {
+		It("closes the Connection when it was created by DialAddr", func() {
 			if os.Getenv("APPVEYOR") == "True" {
 				Skip("This test is flaky on AppVeyor.")
 			}
@@ -357,12 +357,12 @@ var _ = Describe("Client", func() {
 			mockMultiplexer.EXPECT().AddConn(gomock.Any(), gomock.Any()).Return(manager, nil)
 			manager.EXPECT().Add(gomock.Any(), gomock.Any())
 
-			var conn connection
+			var conn Connection
 			run := make(chan struct{})
 			sessionCreated := make(chan struct{})
 			sess := NewMockQuicSession(mockCtrl)
 			newClientSession = func(
-				connP connection,
+				connP Connection,
 				_ sessionRunner,
 				_ []byte, // token
 				_ protocol.ConnectionID,
@@ -393,15 +393,15 @@ var _ = Describe("Client", func() {
 
 			Eventually(sessionCreated).Should(BeClosed())
 
-			// check that the connection is not closed
+			// check that the Connection is not closed
 			Expect(conn.Write([]byte("foobar"))).To(Succeed())
 
 			close(run)
 			time.Sleep(50 * time.Millisecond)
-			// check that the connection is closed
+			// check that the Connection is closed
 			err := conn.Write([]byte("foobar"))
 			Expect(err).To(HaveOccurred())
-			Expect(err.Error()).To(ContainSubstring("use of closed network connection"))
+			Expect(err.Error()).To(ContainSubstring("use of closed network Connection"))
 
 			Eventually(done).Should(BeClosed())
 		})
@@ -452,7 +452,7 @@ var _ = Describe("Client", func() {
 				Expect(c.MaxIncomingUniStreams).To(BeZero())
 			})
 
-			It("uses 0-byte connection IDs when dialing an address", func() {
+			It("uses 0-byte Connection IDs when dialing an address", func() {
 				config := &Config{}
 				c := populateClientConfig(config, true)
 				Expect(c.ConnectionIDLength).To(BeZero())
@@ -473,11 +473,11 @@ var _ = Describe("Client", func() {
 
 			config := &Config{Versions: []protocol.VersionNumber{protocol.VersionTLS}}
 			c := make(chan struct{})
-			var cconn connection
+			var cconn Connection
 			var version protocol.VersionNumber
 			var conf *Config
 			newClientSession = func(
-				connP connection,
+				connP Connection,
 				_ sessionRunner,
 				tokenP []byte,
 				_ protocol.ConnectionID,
@@ -494,7 +494,7 @@ var _ = Describe("Client", func() {
 				version = versionP
 				conf = configP
 				close(c)
-				// TODO: check connection IDs?
+				// TODO: check Connection IDs?
 				sess := NewMockQuicSession(mockCtrl)
 				sess.EXPECT().run()
 				return sess, nil
@@ -502,7 +502,7 @@ var _ = Describe("Client", func() {
 			_, err := Dial(packetConn, addr, "localhost:1337", nil, config)
 			Expect(err).ToNot(HaveOccurred())
 			Eventually(c).Should(BeClosed())
-			Expect(cconn.(*conn).pconn).To(Equal(packetConn))
+			Expect(cconn.(*Conn).pconn).To(Equal(packetConn))
 			Expect(version).To(Equal(config.Versions[0]))
 			Expect(conf.Versions).To(Equal(config.Versions))
 		})
@@ -539,7 +539,7 @@ var _ = Describe("Client", func() {
 			sessions <- sess1
 			sessions <- sess2
 			newClientSession = func(
-				conn connection,
+				conn Connection,
 				_ sessionRunner,
 				_ []byte, // token
 				origDestConnID protocol.ConnectionID,
@@ -607,7 +607,7 @@ var _ = Describe("Client", func() {
 			sessions <- sess
 
 			newClientSession = func(
-				conn connection,
+				conn Connection,
 				_ sessionRunner,
 				_ []byte, // token
 				_ protocol.ConnectionID,
@@ -646,7 +646,7 @@ var _ = Describe("Client", func() {
 
 				testErr := errors.New("early handshake error")
 				newClientSession = func(
-					conn connection,
+					conn Connection,
 					_ sessionRunner,
 					_ []byte, // token
 					_ protocol.ConnectionID,
@@ -735,7 +735,7 @@ var _ = Describe("Client", func() {
 		Expect(cl.GetVersion()).To(Equal(cl.version))
 	})
 
-	It("ignores packets with the wrong destination connection ID", func() {
+	It("ignores packets with the wrong destination Connection ID", func() {
 		cl.session = NewMockQuicSession(mockCtrl) // don't EXPECT any handlePacket calls
 		connID2 := protocol.ConnectionID{8, 7, 6, 5, 4, 3, 2, 1}
 		Expect(connID).ToNot(Equal(connID2))
@@ -749,6 +749,6 @@ var _ = Describe("Client", func() {
 			remoteAddr: addr,
 			header:     hdr,
 		})
-		Expect(err).To(MatchError(fmt.Sprintf("received a packet with an unexpected connection ID (0x0807060504030201, expected %s)", connID)))
+		Expect(err).To(MatchError(fmt.Sprintf("received a packet with an unexpected Connection ID (0x0807060504030201, expected %s)", connID)))
 	})
 })

@@ -49,7 +49,7 @@ var _ = Describe("Packet Handler Map", func() {
 	})
 
 	Context("handling packets", func() {
-		It("handles packets for different packet handlers on the same packet conn", func() {
+		It("handles packets for different packet handlers on the same packet Conn", func() {
 			connID1 := protocol.ConnectionID{1, 2, 3, 4, 5, 6, 7, 8}
 			connID2 := protocol.ConnectionID{8, 7, 6, 5, 4, 3, 2, 1}
 			packetHandler1 := NewMockPacketHandler(mockCtrl)
@@ -95,7 +95,7 @@ var _ = Describe("Packet Handler Map", func() {
 			handler.Remove(connID)
 			Eventually(func() error {
 				return handler.handlePacket(nil, getPacket(connID))
-			}).Should(MatchError("received a packet with an unexpected connection ID 0x0102030405060708"))
+			}).Should(MatchError("received a packet with an unexpected Connection ID 0x0102030405060708"))
 		})
 
 		It("ignores packets arriving late for closed sessions", func() {
@@ -110,7 +110,7 @@ var _ = Describe("Packet Handler Map", func() {
 		It("drops packets for unknown receivers", func() {
 			connID := protocol.ConnectionID{1, 2, 3, 4, 5, 6, 7, 8}
 			err := handler.handlePacket(nil, getPacket(connID))
-			Expect(err).To(MatchError("received a packet with an unexpected connection ID 0x0102030405060708"))
+			Expect(err).To(MatchError("received a packet with an unexpected Connection ID 0x0102030405060708"))
 		})
 
 		It("errors on packets that are smaller than the Payload Length in the packet header", func() {
@@ -160,7 +160,7 @@ var _ = Describe("Packet Handler Map", func() {
 			Expect(err).ToNot(HaveOccurred())
 		})
 
-		It("closes the packet handlers when reading from the conn fails", func() {
+		It("closes the packet handlers when reading from the Conn fails", func() {
 			done := make(chan struct{})
 			packetHandler := NewMockPacketHandler(mockCtrl)
 			packetHandler.EXPECT().destroy(gomock.Any()).Do(func(e error) {
@@ -197,13 +197,13 @@ var _ = Describe("Packet Handler Map", func() {
 			handler.CloseServer()
 		})
 
-		It("stops handling packets with unknown connection IDs after the server is closed", func() {
+		It("stops handling packets with unknown Connection IDs after the server is closed", func() {
 			connID := protocol.ConnectionID{0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88}
 			p := getPacket(connID)
 			server := NewMockUnknownPacketHandler(mockCtrl)
 			handler.SetServer(server)
 			handler.CloseServer()
-			Expect(handler.handlePacket(nil, p)).To(MatchError("received a packet with an unexpected connection ID 0x1122334455667788"))
+			Expect(handler.handlePacket(nil, p)).To(MatchError("received a packet with an unexpected Connection ID 0x1122334455667788"))
 		})
 	})
 })
