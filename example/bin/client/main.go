@@ -1,6 +1,7 @@
 package main
 
 import (
+	"crypto/sha256"
 	"crypto/tls"
 	"flag"
 	"fmt"
@@ -44,8 +45,10 @@ func main() {
 	if err != nil {
 		return
 	}
-
-	fmt.Printf("Client: Sending '%s'\n", len(message))
+	hasher := sha256.New()
+	hasher.Write(message)
+	sha := string(hasher.Sum(nil))
+	fmt.Println("SHA256 of message is" + sha)
 	_, err = stream.Write(message)
 	if err != nil {
 		return

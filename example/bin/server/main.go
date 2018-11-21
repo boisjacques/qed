@@ -3,10 +3,12 @@ package main
 import (
 	"crypto/rand"
 	"crypto/rsa"
+	"crypto/sha256"
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/pem"
 	"flag"
+	"fmt"
 	"github.com/boisjacques/qed"
 	"math/big"
 	"os"
@@ -38,6 +40,10 @@ func main() {
 	}
 	recv := make([]byte, 0)
 	stream.Read(recv)
+	hasher := sha256.New()
+	hasher.Write(recv)
+	sha := string(hasher.Sum(nil))
+	fmt.Println("SHA256 of message is " + sha)
 	f.Write(recv)
 }
 
