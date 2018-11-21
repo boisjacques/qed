@@ -7,9 +7,7 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"flag"
-	"fmt"
 	"github.com/boisjacques/qed"
-	"io"
 	"math/big"
 	"os"
 )
@@ -21,7 +19,7 @@ func main() {
 	flag.StringVar(&path, "path", "out.file", "/path/to/file")
 	listener, err := quic.ListenAddr(addr, generateTLSConfig(), nil)
 
-	f, err := os.Open(path)
+	f, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE, 0755)
 	if err != nil {
 		panic(err)
 	}
@@ -41,21 +39,10 @@ func main() {
 	recv := make([]byte, 0)
 	stream.Read(recv)
 	f.Write(recv)
-
-	// Echo through the loggingWriter
-	_, err = io.Copy(loggingWriter{stream}, stream)
-
-}
-
-// A wrapper for io.Writer that also logs the message.
-type loggingWriter struct{ io.Writer }
-
-func (w loggingWriter) Write(b []byte) (int, error) {
-	fmt.Printf("Server: Got '%s'\n", string(b))
-	return w.Writer.Write(b)
 }
 
 // Setup a bare-bones TLS config for the server
+// Copied from quic-go
 func generateTLSConfig() *tls.Config {
 	key, err := rsa.GenerateKey(rand.Reader, 1024)
 	if err != nil {
