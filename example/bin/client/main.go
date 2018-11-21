@@ -5,7 +5,9 @@ import (
 	"flag"
 	"fmt"
 	"github.com/boisjacques/qed"
+	"math/rand"
 	"os"
+	"time"
 )
 
 func main() {
@@ -14,14 +16,24 @@ func main() {
 	flag.StringVar(&addr, "addr", "localhost:4433", "address:port")
 	flag.StringVar(&path, "path", "", "/path/to/file")
 
-	f, err := os.Open(path)
-	if err != nil {
-		panic(err)
-	}
-	defer f.Close()
+	var message []byte
 
-	message := make([]byte, 0)
-	f.Read(message)
+	if path != "" {
+
+		f, err := os.Open(path)
+		if err != nil {
+			panic(err)
+		}
+		defer f.Close()
+
+		message = make([]byte, 0)
+		f.Read(message)
+	} else {
+		messageLen := 100 * 1e6
+		message = make([]byte, messageLen)
+		rand.Seed(time.Now().UnixNano())
+		rand.Read(message)
+	}
 
 	session, err := quic.DialAddr(addr, &tls.Config{InsecureSkipVerify: true}, nil)
 	if err != nil {
@@ -33,11 +45,10 @@ func main() {
 		return
 	}
 
-	fmt.Printf("Client: Sending '%s'\n", message)
+	fmt.Printf("Client: Sending '%s'\n", len(message))
 	_, err = stream.Write(message)
 	if err != nil {
 		return
 	}
-
 
 }
