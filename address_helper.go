@@ -2,7 +2,6 @@ package quic
 
 import (
 	"fmt"
-	"github.com/boisjacques/golang-utils"
 	"log"
 	"net"
 	"strings"
@@ -89,9 +88,7 @@ func (a *AddressHelper) GatherAddresses() {
 
 func (a *AddressHelper) openSocket(local net.Addr) (net.PacketConn, error) {
 	a.lockSockets.Lock()
-	log.Println("locked", util.Tracer())
 	defer a.lockSockets.Unlock()
-	defer log.Println("unlocked", util.Tracer())
 	var err error = nil
 	usock, contains := a.sockets[local]
 	if !contains {
@@ -103,9 +100,7 @@ func (a *AddressHelper) openSocket(local net.Addr) (net.PacketConn, error) {
 
 func (a *AddressHelper) cleanUp() error {
 	a.lockAddresses.Lock()
-	log.Println("locked: ", util.Tracer())
 	defer a.lockAddresses.Unlock()
-	defer log.Println("unlocked: ", util.Tracer())
 	for key, value := range a.ipAddresses {
 		if value == false {
 			a.Publish(key)
@@ -125,43 +120,33 @@ func (a *AddressHelper) cleanUp() error {
 
 func (a *AddressHelper) GetAddresses() *map[net.Addr]bool {
 	a.lockAddresses.RLock()
-	log.Println("locked: ", util.Tracer())
 	defer a.lockAddresses.RUnlock()
-	defer log.Println("unlocked: ", util.Tracer())
 	return &a.ipAddresses
 }
 
 func (a *AddressHelper) write(addr net.Addr, bool bool) {
 	a.lockAddresses.Lock()
-	log.Println("locked: ", util.Tracer())
 	defer a.lockAddresses.Unlock()
-	defer log.Println("unlocked: ", util.Tracer())
 	a.ipAddresses[addr] = bool
 }
 
 func (a *AddressHelper) containsAddress(addr net.Addr) bool {
 	a.lockAddresses.RLock()
-	log.Println("locked: ", util.Tracer())
 	defer a.lockAddresses.RUnlock()
-	defer log.Println("unlocked: ", util.Tracer())
 	_, contains := a.ipAddresses[addr]
 	return contains
 }
 
 func (a *AddressHelper) containsSocket(addr net.Addr) bool {
 	a.lockSockets.RLock()
-	log.Println("locked: ", util.Tracer())
 	defer a.lockSockets.RUnlock()
-	defer log.Println("unlocked: ", util.Tracer())
 	_, contains := a.sockets[addr]
 	return contains
 }
 
 func (a *AddressHelper) falsifyAddresses() {
 	a.lockAddresses.Lock()
-	log.Println("locked: ", util.Tracer())
 	defer a.lockAddresses.Unlock()
-	defer log.Println("unlocked: ", util.Tracer())
 	for address := range a.ipAddresses {
 		a.ipAddresses[address] = false
 	}

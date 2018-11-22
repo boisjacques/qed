@@ -13,6 +13,7 @@ import (
 	"log"
 	"math/big"
 	"os"
+	"time"
 )
 
 func main() {
@@ -43,12 +44,18 @@ func main() {
 		panic(err)
 	}
 	recv := make([]byte, 0)
-	stream.Read(recv)
+	if _,err := stream.Read(recv); err != nil {
+		log.Fatalf("error receiving packets: %s", err)
+	}
+	log.Printf("server shut down at: %s", time.Now())
 	hasher := sha256.New()
 	hasher.Write(recv)
 	sha := string(hasher.Sum(nil))
 	fmt.Println("SHA256 of message is " + sha)
-	f.Write(recv)
+
+	if _,err := f.Write(recv); err != nil {
+		log.Fatalf("error writing file: %s", err)
+	}
 }
 
 // Setup a bare-bones TLS config for the server
@@ -73,7 +80,7 @@ func generateTLSConfig() *tls.Config {
 		panic(err)
 	}
 	if _,err := keyOut.Write(keyPEM); err != nil {
-		log.Fatal("error writing key")
+		log.Fatalf("error writing key: %s", err)
 	}
 	if err := keyOut.Close(); err != nil {
 		log.Fatalf("error closing key.pem: %s", err)
