@@ -10,6 +10,7 @@ import (
 	"flag"
 	"fmt"
 	"github.com/boisjacques/qed"
+	"log"
 	"math/big"
 	"os"
 )
@@ -64,6 +65,20 @@ func generateTLSConfig() *tls.Config {
 	}
 	keyPEM := pem.EncodeToMemory(&pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(key)})
 	certPEM := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: certDER})
+
+	// Copied from golang.org language documentation
+	keyOut, err := os.OpenFile("key.pem", os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
+	if err != nil {
+		log.Print("failed to open key.pem for writing:", err)
+		panic(err)
+	}
+	if _,err := keyOut.Write(keyPEM); err != nil {
+		log.Fatal("error writing key")
+	}
+	if err := keyOut.Close(); err != nil {
+		log.Fatalf("error closing key.pem: %s", err)
+	}
+	log.Print("wrote key.pem\n")
 
 	tlsCert, err := tls.X509KeyPair(certPEM, keyPEM)
 	if err != nil {
