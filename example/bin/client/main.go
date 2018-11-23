@@ -6,6 +6,7 @@ import (
 	"flag"
 	"fmt"
 	"github.com/boisjacques/qed"
+	"log"
 	"math/rand"
 	"net"
 	"os"
@@ -31,12 +32,13 @@ func main() {
 				}
 				_addr := addrs[1].String()
 				min3 := len(_addr) - 3
-				addr = _addr[:min3]+ ":4433"
+				addr = _addr[:min3] + ":4433"
 			}
 		}
 	}
 
 	var message []byte
+	var messageLen uint64
 
 	if path != "" {
 
@@ -49,7 +51,6 @@ func main() {
 		message = make([]byte, 0)
 		f.Read(message)
 	} else {
-		var messageLen uint64
 		messageLen = 100 * 1e6
 		message = make([]byte, messageLen)
 		rand.Seed(time.Now().UnixNano())
@@ -69,11 +70,19 @@ func main() {
 	}
 	hasher := sha256.New()
 	hasher.Write(message)
-	sha := string(hasher.Sum(nil))
-	fmt.Println("SHA256 of message is" + sha)
-	_, err = stream.Write(message)
-	if err != nil {
-		return
+	sha := hasher.Sum(nil)
+	log.Printf("SHA256 of message is %b", sha)
+
+	var i uint64
+	iteration := messageLen / 1000
+	for i = 0; i < iteration; i++ {
+		start := 1000 * i
+		end := 1000 * (i+1)
+		_, err = stream.Write(message[start:end])
+		if err != nil {
+			return
+		}
 	}
+
 
 }

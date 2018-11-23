@@ -8,7 +8,6 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"flag"
-	"fmt"
 	"github.com/boisjacques/qed"
 	"log"
 	"math/big"
@@ -45,13 +44,13 @@ func main() {
 	}
 	recv := make([]byte, 0)
 	if _,err := stream.Read(recv); err != nil {
-		log.Fatalf("error receiving packets: %s", err)
+		log.Fatalf("error reading from stream %s: %s", stream.StreamID().StreamNum(), err)
 	}
 	log.Printf("server shut down at: %s", time.Now())
 	hasher := sha256.New()
 	hasher.Write(recv)
-	sha := string(hasher.Sum(nil))
-	fmt.Println("SHA256 of message is " + sha)
+	sha := hasher.Sum(nil)
+	log.Printf("SHA256 of message is %b", sha)
 
 	if _,err := f.Write(recv); err != nil {
 		log.Fatalf("error writing file: %s", err)
