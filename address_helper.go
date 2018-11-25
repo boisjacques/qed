@@ -31,7 +31,7 @@ func GetAddressHelper() *AddressHelper {
 		}
 		go func() {
 			for {
-				addrHlp.GatherAddresses()
+				addrHlp.gatherAddresses()
 				time.Sleep(100 * time.Millisecond)
 			}
 		}()
@@ -43,7 +43,7 @@ func (a *AddressHelper) Subscribe(c chan net.Addr) {
 	a.listeners = append(a.listeners, c)
 }
 
-func (a *AddressHelper) Publish(msg net.Addr) {
+func (a *AddressHelper) publish(msg net.Addr) {
 	if len(a.listeners) > 0 {
 		for _, c := range a.listeners {
 			c <- msg
@@ -51,7 +51,7 @@ func (a *AddressHelper) Publish(msg net.Addr) {
 	}
 }
 
-func (a *AddressHelper) GatherAddresses() {
+func (a *AddressHelper) gatherAddresses() {
 	a.falsifyAddresses()
 	interfaces, _ := net.Interfaces()
 	for _, iface := range interfaces {
@@ -73,7 +73,7 @@ func (a *AddressHelper) GatherAddresses() {
 						}
 						if !a.containsAddress(udpAddr) {
 							a.write(udpAddr, true)
-							a.Publish(udpAddr)
+							a.publish(udpAddr)
 						}
 					}
 				}
@@ -102,7 +102,7 @@ func (a *AddressHelper) cleanUp() error {
 	defer a.lockAddresses.Unlock()
 	for key, value := range a.ipAddresses {
 		if value == false {
-			a.Publish(key)
+			a.publish(key)
 			time.Sleep(100 * time.Millisecond) //Wait 100 ms for handling in scheduler
 			if a.containsSocket(key) {
 				err := a.sockets[key].Close()

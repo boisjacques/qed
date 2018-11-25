@@ -139,18 +139,20 @@ func (s *Scheduler) addLocalAddress(local net.Addr) {
 	}
 }
 
-func (s *Scheduler) addRemoteAddress(remote net.Addr) {
-	s.remoteAddrs[remote] = struct{}{}
-	s.addressHelper.lockAddresses.RLock()
-	defer s.addressHelper.lockAddresses.RUnlock()
-	for local := range s.localAddrs {
-		if isSameVersion(local, remote) {
-			s.newPath(local, remote)
+func (s *Scheduler) addRemoteAddress(addr net.Addr) {
+	if !s.containsBlocking(addr, remote) {
+		s.remoteAddrs[addr] = struct{}{}
+		s.addressHelper.lockAddresses.RLock()
+		defer s.addressHelper.lockAddresses.RUnlock()
+		for laddr := range s.localAddrs {
+			if isSameVersion(laddr, addr) {
+				s.newPath(laddr, addr)
+			}
 		}
-	}
-	remoteAdded := true
-	if remoteAdded {
-		//For breakpoints only
+		remoteAdded := true
+		if remoteAdded {
+			//For breakpoints only
+		}
 	}
 }
 
@@ -201,9 +203,11 @@ func (s *Scheduler) ListenOnChannel() {
 				if !s.containsBlocking(addr, local) {
 					s.write(addr)
 					s.session.(*session).QueueQedFrame(s.assembleAddrModFrame(wire.AddFrame, addr))
+					s.session.(*session).logger.Debugf("Queued addition frame for address %s", addr.String())
 				} else {
 					s.delete(addr, local)
 					s.session.(*session).QueueQedFrame(s.assembleAddrModFrame(wire.DeleteFrame, addr))
+					s.session.(*session).logger.Debugf("Queued deletion frame for address %s", addr.String())
 				}
 			} else {
 				if time.Now().Second()-oldTime == 10 {
@@ -393,4 +397,16 @@ func (s *Scheduler) calculateAverageOwd() uint64 {
 	}
 	aOwd = aOwd / uint64(len(s.paths))
 	return aOwd
+}
+
+func (s *Scheduler) announceAddresses() {
+	go func() {
+		for !s.isactive {
+
+		}
+		for addr := range s.localAddrs{
+			s.session.(*session).QueueQedFrame(s.assembleAddrModFrame(wire.AddFrame, addr))
+			s.session.(*session).logger.Debugf("Queued addition frame for address %s", addr.String())
+		}
+	}()
 }

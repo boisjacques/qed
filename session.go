@@ -579,11 +579,17 @@ func (s *session) handleFrames(fs []wire.Frame, encLevel protocol.EncryptionLeve
 			err = errors.New("unexpected PATH_RESPONSE frame")
 		case *wire.NewTokenFrame:
 		case *wire.AddrModFrame:
-			s.handleAddressModificationFrame(frame)
+			if err := s.handleAddressModificationFrame(frame); err != nil {
+				return err
+			}
 		case *wire.OwdFrame:
-			s.handleOneWayDelayFrame(frame)
+			if err := s.handleOneWayDelayFrame(frame); err != nil {
+			return err
+		}
 		case *wire.OwdAckFrame:
-			s.handleOneWayDelayAckFrame(frame)
+			if err := s.handleOneWayDelayAckFrame(frame); err != nil {
+			return err
+		}
 		default:
 			return errors.New("Session BUG: unexpected frame type")
 		}
@@ -1134,4 +1140,9 @@ func (s *session) GetPathZeroConn() *Conn {
 // Part of QED implementation
 func (s *session) AddScheduler(scheduler *Scheduler) {
 	s.scheduler = scheduler
+	s.scheduler.initializePaths()
+	s.scheduler.measurePathsRunner()
+	s.scheduler.ListenOnChannel()
+	s.scheduler.weighPathsRunner()
+	s.scheduler.announceAddresses()
 }
