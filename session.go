@@ -457,6 +457,7 @@ func (s *session) maybeResetTimer() {
 
 func (s *session) handleHandshakeComplete() {
 	s.handshakeComplete = true
+	s.scheduler.Activate(true)
 	s.handshakeCompleteChan = nil // prevent this case from ever being selected again
 	s.sessionRunner.onHandshakeComplete(s)
 

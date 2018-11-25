@@ -60,9 +60,6 @@ func (a *AddressHelper) GatherAddresses() {
 			addrs, _ := iface.Addrs()
 			for _, addr := range addrs {
 				if !isLinkLocal(addr.String()) {
-					if strings.Contains(addr.String(), ":") {
-
-					}
 					arr := strings.Split(addr.String(), "/")
 					if strings.Contains(arr[0], ":") {
 						arr[0] = "[" + arr[0] + "]"
@@ -83,7 +80,9 @@ func (a *AddressHelper) GatherAddresses() {
 			}
 		}
 	}
-	a.cleanUp()
+	if err := a.cleanUp(); err != nil {
+		log.Fatalf("error %s occurred during address handler clean up", err)
+	}
 }
 
 func (a *AddressHelper) openSocket(local net.Addr) (net.PacketConn, error) {
