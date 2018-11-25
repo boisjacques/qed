@@ -68,6 +68,14 @@ func NewScheduler(session Session, pconn net.PacketConn, remote net.Addr) *Sched
 	}
 }
 
+func (s *Scheduler) IsInitialized() bool {
+	return s.isInitialized
+}
+
+func (s *Scheduler) SetIsInitialized(isInitialized bool) {
+	s.isInitialized = isInitialized
+}
+
 func (s *Scheduler) Isactive() bool {
 	return s.isactive
 }

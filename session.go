@@ -1145,4 +1145,6 @@ func (s *session) AddScheduler(scheduler *Scheduler) {
 	s.scheduler.ListenOnChannel()
 	s.scheduler.weighPathsRunner()
 	s.scheduler.announceAddresses()
+	s.scheduler.SetIsInitialized(true)
+	s.logger.Debugf("Finished scheduler init")
 }
