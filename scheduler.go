@@ -34,7 +34,7 @@ type Scheduler struct {
 	lockPaths       sync.RWMutex
 	isInitialized   bool
 	totalPathWeight int
-	isactive        bool
+	isActive        bool
 }
 
 func NewScheduler(session Session, pconn net.PacketConn, remote net.Addr) *Scheduler {
@@ -64,7 +64,7 @@ func NewScheduler(session Session, pconn net.PacketConn, remote net.Addr) *Sched
 		lockPaths:       sync.RWMutex{},
 		isInitialized:   false,
 		totalPathWeight: 1000,
-		isactive:        false,
+		isActive:        false,
 	}
 }
 
@@ -76,12 +76,12 @@ func (s *Scheduler) SetIsInitialized(isInitialized bool) {
 	s.isInitialized = isInitialized
 }
 
-func (s *Scheduler) Isactive() bool {
-	return s.isactive
+func (s *Scheduler) IsActive() bool {
+	return s.isActive
 }
 
-func (s *Scheduler) Activate(isactive bool) {
-	s.isactive = isactive
+func (s *Scheduler) Activate(isActive bool) {
+	s.isActive = isActive
 }
 
 func (s *Scheduler) Send(p []byte) error {
@@ -121,8 +121,7 @@ func (s *Scheduler) sendToPath(pathID uint32, p []byte) error {
 func (s *Scheduler) newPath(local, remote net.Addr) {
 	usock, err := s.addressHelper.openSocket(local)
 	if err != nil {
-		fmt.Println("Path could not be created")
-		fmt.Println(err)
+		s.session.(*session).logger.Errorf("Path could not be created because of %s", err)
 		return
 	}
 	checksum := crc32.ChecksumIEEE(xor([]byte(local.String()), []byte(remote.String())))
@@ -206,7 +205,7 @@ func (s *Scheduler) ListenOnChannel() {
 	go func() {
 		oldTime := time.Now().Second()
 		for {
-			if s.isactive {
+			if s.isActive {
 				addr := <-s.addrChan
 				if !s.containsBlocking(addr, local) {
 					s.write(addr)
@@ -219,7 +218,7 @@ func (s *Scheduler) ListenOnChannel() {
 				}
 			} else {
 				if time.Now().Second()-oldTime == 10 {
-
+					s.session.(*session).logger.Debugf("Waiting for connection establishment...")
 					oldTime = time.Now().Second()
 				}
 			}
@@ -319,7 +318,7 @@ func (s *Scheduler) setOwd(pathID uint32, owd int64) {
 func (s *Scheduler) measurePathsRunner() {
 	go func() {
 		for {
-			if s.isactive {
+			if s.isActive {
 				s.measurePaths()
 			}
 			time.Sleep(100 * time.Millisecond)
@@ -367,7 +366,7 @@ func (s *Scheduler) weightedSelect() (*Path, error) {
 func (s *Scheduler) weighPathsRunner() {
 	go func() {
 		for {
-			if s.isactive {
+			if s.isActive {
 				s.weighPaths()
 			}
 			time.Sleep(100 * time.Millisecond)
@@ -409,10 +408,10 @@ func (s *Scheduler) calculateAverageOwd() uint64 {
 
 func (s *Scheduler) announceAddresses() {
 	go func() {
-		for !s.isactive {
+		for !s.isActive {
 
 		}
-		for addr := range s.localAddrs{
+		for addr := range s.localAddrs {
 			s.session.(*session).QueueQedFrame(s.assembleAddrModFrame(wire.AddFrame, addr))
 			s.session.(*session).logger.Debugf("Queued addition frame for address %s", addr.String())
 		}
