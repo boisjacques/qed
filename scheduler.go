@@ -12,11 +12,11 @@ import (
 	"time"
 )
 
-type direcionAddr uint8
+type directionAddr uint8
 
 const (
-	local  = direcionAddr(0)
-	remote = direcionAddr(1)
+	local  = directionAddr(0)
+	remote = directionAddr(1)
 )
 
 type Scheduler struct {
@@ -86,6 +86,7 @@ func (s *Scheduler) Activate(isActive bool) {
 
 func (s *Scheduler) Send(p []byte) error {
 	s.lockPaths.RLock()
+	s.session.(*session).logger.Debugf("Locked Mutex %s", util.Tracer())
 	defer s.lockPaths.RUnlock()
 	path, err := s.weightedSelect()
 	if err != nil {
@@ -150,7 +151,9 @@ func (s *Scheduler) addRemoteAddress(addr net.Addr) {
 	if !s.containsBlocking(addr, remote) {
 		s.remoteAddrs[addr] = struct{}{}
 		s.addressHelper.lockAddresses.RLock()
+		s.session.(*session).logger.Debugf("Locked Mutex %s", util.Tracer())
 		defer s.addressHelper.lockAddresses.RUnlock()
+		defer s.session.(*session).logger.Debugf("Unocked Mutex %s", util.Tracer())
 		for laddr := range s.localAddrs {
 			if isSameVersion(laddr, addr) {
 				s.newPath(laddr, addr)
@@ -179,9 +182,13 @@ func (s *Scheduler) removeAddress(address net.Addr) {
 
 func (s *Scheduler) initializePaths() {
 	s.addressHelper.lockAddresses.RLock()
+	s.session.(*session).logger.Debugf("Locked Mutex %s", util.Tracer())
 	s.lockRemote.RLock()
+	s.session.(*session).logger.Debugf("Locked Mutex %s", util.Tracer())
 	defer s.addressHelper.lockAddresses.RUnlock()
+	defer s.session.(*session).logger.Debugf("Unocked Mutex %s", util.Tracer())
 	defer s.lockRemote.RUnlock()
+	defer s.session.(*session).logger.Debugf("Unocked Mutex %s", util.Tracer())
 	for local := range s.localAddrs {
 		for remote := range s.remoteAddrs {
 			if isSameVersion(local, remote) {
@@ -265,21 +272,25 @@ func isSameVersion(local, remote net.Addr) bool {
 	return false
 }
 
-func (s *Scheduler) containsBlocking(addr net.Addr, direcion direcionAddr) bool {
+func (s *Scheduler) containsBlocking(addr net.Addr, direcion directionAddr) bool {
 	var contains bool
 	if direcion == local {
 		s.addressHelper.lockAddresses.RLock()
+		s.session.(*session).logger.Debugf("Locked Mutex %s", util.Tracer())
 		defer s.addressHelper.lockAddresses.RUnlock()
+		defer s.session.(*session).logger.Debugf("Unocked Mutex %s", util.Tracer())
 		_, contains = s.localAddrs[addr]
 	} else if direcion == remote {
 		s.lockRemote.Lock()
+		s.session.(*session).logger.Debugf("Locked Mutex %s", util.Tracer())
 		defer s.lockRemote.Unlock()
+		defer s.session.(*session).logger.Debugf("Unocked Mutex %s", util.Tracer())
 		_, contains = s.remoteAddrs[addr]
 	}
 	return contains
 }
 
-func (s *Scheduler) delete(addr net.Addr, direction direcionAddr) {
+func (s *Scheduler) delete(addr net.Addr, direction directionAddr) {
 	for key, path := range s.paths {
 		if path.contains(addr) {
 			s.deletePath(key)
@@ -287,31 +298,41 @@ func (s *Scheduler) delete(addr net.Addr, direction direcionAddr) {
 	}
 	if direction == local {
 		s.addressHelper.lockAddresses.Lock()
+		s.session.(*session).logger.Debugf("Locked Mutex %s", util.Tracer())
 		defer s.addressHelper.lockAddresses.Unlock()
+		defer s.session.(*session).logger.Debugf("Unocked Mutex %s", util.Tracer())
 		delete(s.localAddrs, addr)
 	}
 	if direction == remote {
 		s.lockRemote.Lock()
+		s.session.(*session).logger.Debugf("Locked Mutex %s", util.Tracer())
 		defer s.lockRemote.Unlock()
+		defer s.session.(*session).logger.Debugf("Unocked Mutex %s", util.Tracer())
 		delete(s.remoteAddrs, addr)
 	}
 }
 
 func (s *Scheduler) deletePath(pathId uint32) {
 	s.lockPaths.Lock()
+	s.session.(*session).logger.Debugf("Locked Mutex %s", util.Tracer())
 	defer s.lockPaths.Unlock()
+	defer s.session.(*session).logger.Debugf("Unocked Mutex %s", util.Tracer())
 	delete(s.paths, pathId)
 }
 
 func (s *Scheduler) write(addr net.Addr) {
 	s.addressHelper.lockAddresses.Lock()
+	s.session.(*session).logger.Debugf("Locked Mutex %s", util.Tracer())
 	defer s.addressHelper.lockAddresses.Unlock()
+	defer s.session.(*session).logger.Debugf("Unocked Mutex %s", util.Tracer())
 	s.localAddrs[addr] = false
 }
 
 func (s *Scheduler) setOwd(pathID uint32, owd int64) {
 	s.lockPaths.Lock()
+	s.session.(*session).logger.Debugf("Locked Mutex %s", util.Tracer())
 	defer s.lockPaths.Unlock()
+	defer s.session.(*session).logger.Debugf("Unocked Mutex %s", util.Tracer())
 	s.paths[pathID].setOwd(owd)
 }
 
@@ -336,13 +357,17 @@ func (s *Scheduler) measurePaths() {
 //TODO: Time has to move further down the path
 func (s *Scheduler) measurePath(path *Path) {
 	s.lockPaths.RLock()
+	s.session.(*session).logger.Debugf("Locked Mutex %s", util.Tracer())
 	defer s.lockPaths.RUnlock()
+	defer s.session.(*session).logger.Debugf("Unocked Mutex %s", util.Tracer())
 	s.session.(*session).QueueQedFrame(s.assembleOwdFrame(path.pathID))
 }
 
 func (s *Scheduler) sumUpWeights() {
 	s.lockPaths.RLock()
+	s.session.(*session).logger.Debugf("Locked Mutex %s", util.Tracer())
 	defer s.lockPaths.RUnlock()
+	defer s.session.(*session).logger.Debugf("Unocked Mutex %s", util.Tracer())
 	s.totalPathWeight = 0
 	for _, path := range s.paths {
 		s.totalPathWeight += path.weight
@@ -351,7 +376,9 @@ func (s *Scheduler) sumUpWeights() {
 
 func (s *Scheduler) weightedSelect() (*Path, error) {
 	s.lockPaths.RLock()
+	s.session.(*session).logger.Debugf("Locked Mutex %s", util.Tracer())
 	defer s.lockPaths.RUnlock()
+	defer s.session.(*session).logger.Debugf("Unocked Mutex %s", util.Tracer())
 	rand.Seed(time.Now().UnixNano())
 	r := rand.Intn(s.totalPathWeight)
 	for _, path := range s.paths {
@@ -376,6 +403,9 @@ func (s *Scheduler) weighPathsRunner() {
 
 func (s *Scheduler) weighPaths() {
 	s.lockPaths.Lock()
+	s.session.(*session).logger.Debugf("Locked Mutex %s", util.Tracer())
+	defer s.lockPaths.Unlock()
+	defer s.session.(*session).logger.Debugf("Unocked Mutex %s", util.Tracer())
 	for _, path := range s.paths {
 		s.weighPath(path)
 	}
@@ -384,7 +414,9 @@ func (s *Scheduler) weighPaths() {
 
 func (s *Scheduler) weighPath(path *Path) {
 	s.lockPaths.Lock()
+	s.session.(*session).logger.Debugf("Locked Mutex %s", util.Tracer())
 	defer s.lockPaths.Unlock()
+	defer s.session.(*session).logger.Debugf("Unocked Mutex %s", util.Tracer())
 	if path.owd < s.calculateAverageOwd() {
 		if path.weight < 1000 {
 			path.weight = path.weight + 1

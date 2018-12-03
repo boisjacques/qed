@@ -2,6 +2,7 @@ package quic
 
 import (
 	"fmt"
+	"github.com/boisjacques/golang-utils"
 	"log"
 	"net"
 	"strings"
@@ -87,7 +88,9 @@ func (a *AddressHelper) gatherAddresses() {
 
 func (a *AddressHelper) openSocket(local net.Addr) (net.PacketConn, error) {
 	a.lockSockets.Lock()
+	log.Printf("Locked Mutex %s", util.Tracer())
 	defer a.lockSockets.Unlock()
+	defer log.Printf("Unlocked Mutex %s", util.Tracer())
 	var err error = nil
 	usock, contains := a.sockets[local]
 	if !contains {
@@ -99,7 +102,9 @@ func (a *AddressHelper) openSocket(local net.Addr) (net.PacketConn, error) {
 
 func (a *AddressHelper) cleanUp() error {
 	a.lockAddresses.Lock()
+	log.Printf("Locked Mutex %s", util.Tracer())
 	defer a.lockAddresses.Unlock()
+	defer log.Printf("Unlocked Mutex %s", util.Tracer())
 	for key, value := range a.ipAddresses {
 		if value == false {
 			a.publish(key)
@@ -119,33 +124,43 @@ func (a *AddressHelper) cleanUp() error {
 
 func (a *AddressHelper) GetAddresses() *map[net.Addr]bool {
 	a.lockAddresses.RLock()
+	log.Printf("Locked Mutex %s", util.Tracer())
 	defer a.lockAddresses.RUnlock()
+	defer log.Printf("Unlocked Mutex %s", util.Tracer())
 	return &a.ipAddresses
 }
 
 func (a *AddressHelper) write(addr net.Addr, bool bool) {
 	a.lockAddresses.Lock()
+	log.Printf("Locked Mutex %s", util.Tracer())
 	defer a.lockAddresses.Unlock()
+	defer log.Printf("Unlocked Mutex %s", util.Tracer())
 	a.ipAddresses[addr] = bool
 }
 
 func (a *AddressHelper) containsAddress(addr net.Addr) bool {
 	a.lockAddresses.RLock()
+	log.Printf("Locked Mutex %s", util.Tracer())
 	defer a.lockAddresses.RUnlock()
+	defer log.Printf("Unlocked Mutex %s", util.Tracer())
 	_, contains := a.ipAddresses[addr]
 	return contains
 }
 
 func (a *AddressHelper) containsSocket(addr net.Addr) bool {
 	a.lockSockets.RLock()
+	log.Printf("Locked Mutex %s", util.Tracer())
 	defer a.lockSockets.RUnlock()
+	defer log.Printf("Unlocked Mutex %s", util.Tracer())
 	_, contains := a.sockets[addr]
 	return contains
 }
 
 func (a *AddressHelper) falsifyAddresses() {
 	a.lockAddresses.Lock()
+	log.Printf("Locked Mutex %s", util.Tracer())
 	defer a.lockAddresses.Unlock()
+	defer log.Printf("Unlocked Mutex %s", util.Tracer())
 	for address := range a.ipAddresses {
 		a.ipAddresses[address] = false
 	}
