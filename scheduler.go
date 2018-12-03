@@ -8,7 +8,6 @@ import (
 	"hash/crc32"
 	"math/rand"
 	"net"
-	"sync"
 	"time"
 )
 
@@ -30,8 +29,6 @@ type Scheduler struct {
 	addrChan        chan net.Addr
 	localAddrs      map[net.Addr]bool
 	remoteAddrs     map[net.Addr]struct{}
-	lockRemote      sync.RWMutex
-	lockPaths       sync.RWMutex
 	isInitialized   bool
 	totalPathWeight int
 	isActive        bool
@@ -60,8 +57,6 @@ func NewScheduler(session Session, pconn net.PacketConn, remote net.Addr) *Sched
 		addrChan:        make(chan net.Addr),
 		localAddrs:      GetAddressHelper().ipAddresses,
 		remoteAddrs:     make(map[net.Addr]struct{}),
-		lockRemote:      sync.RWMutex{},
-		lockPaths:       sync.RWMutex{},
 		isInitialized:   false,
 		totalPathWeight: 1000,
 		isActive:        false,
@@ -85,8 +80,6 @@ func (s *Scheduler) Activate(isActive bool) {
 }
 
 func (s *Scheduler) Send(p []byte) error {
-	s.lockPaths.RLock()
-	defer s.lockPaths.RUnlock()
 	path, err := s.weightedSelect()
 	if err != nil {
 		fmt.Println(err, util.Tracer())
@@ -149,8 +142,6 @@ func (s *Scheduler) addLocalAddress(local net.Addr) {
 func (s *Scheduler) addRemoteAddress(addr net.Addr) {
 	if !s.containsBlocking(addr, remote) {
 		s.remoteAddrs[addr] = struct{}{}
-		s.addressHelper.lockAddresses.RLock()
-		defer s.addressHelper.lockAddresses.RUnlock()
 		for laddr := range s.localAddrs {
 			if isSameVersion(laddr, addr) {
 				s.newPath(laddr, addr)
@@ -178,10 +169,6 @@ func (s *Scheduler) removeAddress(address net.Addr) {
 }
 
 func (s *Scheduler) initializePaths() {
-	s.addressHelper.lockAddresses.RLock()
-	s.lockRemote.RLock()
-	defer s.addressHelper.lockAddresses.RUnlock()
-	defer s.lockRemote.RUnlock()
 	for local := range s.localAddrs {
 		for remote := range s.remoteAddrs {
 			if isSameVersion(local, remote) {
@@ -268,12 +255,8 @@ func isSameVersion(local, remote net.Addr) bool {
 func (s *Scheduler) containsBlocking(addr net.Addr, direcion direcionAddr) bool {
 	var contains bool
 	if direcion == local {
-		s.addressHelper.lockAddresses.RLock()
-		defer s.addressHelper.lockAddresses.RUnlock()
 		_, contains = s.localAddrs[addr]
 	} else if direcion == remote {
-		s.lockRemote.Lock()
-		defer s.lockRemote.Unlock()
 		_, contains = s.remoteAddrs[addr]
 	}
 	return contains
@@ -286,32 +269,22 @@ func (s *Scheduler) delete(addr net.Addr, direction direcionAddr) {
 		}
 	}
 	if direction == local {
-		s.addressHelper.lockAddresses.Lock()
-		defer s.addressHelper.lockAddresses.Unlock()
 		delete(s.localAddrs, addr)
 	}
 	if direction == remote {
-		s.lockRemote.Lock()
-		defer s.lockRemote.Unlock()
 		delete(s.remoteAddrs, addr)
 	}
 }
 
 func (s *Scheduler) deletePath(pathId uint32) {
-	s.lockPaths.Lock()
-	defer s.lockPaths.Unlock()
 	delete(s.paths, pathId)
 }
 
 func (s *Scheduler) write(addr net.Addr) {
-	s.addressHelper.lockAddresses.Lock()
-	defer s.addressHelper.lockAddresses.Unlock()
 	s.localAddrs[addr] = false
 }
 
 func (s *Scheduler) setOwd(pathID uint32, owd int64) {
-	s.lockPaths.Lock()
-	defer s.lockPaths.Unlock()
 	s.paths[pathID].setOwd(owd)
 }
 
@@ -335,14 +308,10 @@ func (s *Scheduler) measurePaths() {
 
 //TODO: Time has to move further down the path
 func (s *Scheduler) measurePath(path *Path) {
-	s.lockPaths.RLock()
-	defer s.lockPaths.RUnlock()
 	s.session.(*session).QueueQedFrame(s.assembleOwdFrame(path.pathID))
 }
 
 func (s *Scheduler) sumUpWeights() {
-	s.lockPaths.RLock()
-	defer s.lockPaths.RUnlock()
 	s.totalPathWeight = 0
 	for _, path := range s.paths {
 		s.totalPathWeight += path.weight
@@ -350,8 +319,6 @@ func (s *Scheduler) sumUpWeights() {
 }
 
 func (s *Scheduler) weightedSelect() (*Path, error) {
-	s.lockPaths.RLock()
-	defer s.lockPaths.RUnlock()
 	rand.Seed(time.Now().UnixNano())
 	r := rand.Intn(s.totalPathWeight)
 	for _, path := range s.paths {
@@ -375,7 +342,6 @@ func (s *Scheduler) weighPathsRunner() {
 }
 
 func (s *Scheduler) weighPaths() {
-	s.lockPaths.Lock()
 	for _, path := range s.paths {
 		s.weighPath(path)
 	}
@@ -383,8 +349,6 @@ func (s *Scheduler) weighPaths() {
 }
 
 func (s *Scheduler) weighPath(path *Path) {
-	s.lockPaths.Lock()
-	defer s.lockPaths.Unlock()
 	if path.owd < s.calculateAverageOwd() {
 		if path.weight < 1000 {
 			path.weight = path.weight + 1
