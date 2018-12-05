@@ -77,7 +77,8 @@ func parseAddrModFrame(r *bytes.Reader, version protocol.VersionNumber) (*AddrMo
 	if _, err := io.ReadFull(r, addr); err != nil {
 		return nil, err
 	}
-	address, err = net.ResolveUDPAddr("udp", string(addr))
+	strAddr := string(addr)
+	address, err = net.ResolveUDPAddr("udp", strAddr)
 	if err != nil {
 		return nil, err
 	}
