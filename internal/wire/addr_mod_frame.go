@@ -71,7 +71,9 @@ func parseAddrModFrame(r *bytes.Reader, version protocol.VersionNumber) (*AddrMo
 	}
 	addressVersion = IpVersion(av)
 
-	addr := make([]byte, 0)
+	addrLen := r.Len()
+
+	addr := make([]byte, addrLen)
 	if _, err := io.ReadFull(r, addr); err != nil {
 		return nil, err
 	}
