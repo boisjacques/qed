@@ -108,7 +108,7 @@ func newPacketPacker(
 	initialStream cryptoStream,
 	handshakeStream cryptoStream,
 	packetNumberManager packetNumberManager,
-	// remoteAddr net.Addr, // only used for determining the max packet size
+	remoteAddr net.Addr, // only used for determining the max packet size
 	token []byte,
 	cryptoSetup sealingManager,
 	framer frameSource,

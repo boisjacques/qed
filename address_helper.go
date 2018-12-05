@@ -10,11 +10,10 @@ import (
 )
 
 type AddressHelper struct {
-	ipAddresses   map[net.Addr]bool
-	sockets       map[net.Addr]net.PacketConn
-	listeners     []chan net.Addr
-	lockAddresses sync.RWMutex
-	lockSockets   sync.RWMutex
+	ipAddresses map[net.Addr]bool
+	sockets     map[net.Addr]net.PacketConn
+	listeners   []chan net.Addr
+	mutex       sync.RWMutex
 }
 
 var addrHlp *AddressHelper
@@ -23,11 +22,10 @@ var once sync.Once
 func GetAddressHelper() *AddressHelper {
 	once.Do(func() {
 		addrHlp = &AddressHelper{
-			make(map[net.Addr]bool),
-			make(map[net.Addr]net.PacketConn),
-			make([]chan net.Addr, 0),
-			sync.RWMutex{},
-			sync.RWMutex{},
+			ipAddresses: make(map[net.Addr]bool),
+			sockets:     make(map[net.Addr]net.PacketConn),
+			listeners:   make([]chan net.Addr, 0),
+			mutex:       sync.RWMutex{},
 		}
 		go func() {
 			for {
@@ -86,8 +84,6 @@ func (a *AddressHelper) gatherAddresses() {
 }
 
 func (a *AddressHelper) openSocket(local net.Addr) (net.PacketConn, error) {
-	a.lockSockets.Lock()
-	defer a.lockSockets.Unlock()
 	var err error = nil
 	usock, contains := a.sockets[local]
 	if !contains {
@@ -98,8 +94,6 @@ func (a *AddressHelper) openSocket(local net.Addr) (net.PacketConn, error) {
 }
 
 func (a *AddressHelper) cleanUp() error {
-	a.lockAddresses.Lock()
-	defer a.lockAddresses.Unlock()
 	for key, value := range a.ipAddresses {
 		if value == false {
 			a.publish(key)
@@ -118,34 +112,26 @@ func (a *AddressHelper) cleanUp() error {
 }
 
 func (a *AddressHelper) GetAddresses() *map[net.Addr]bool {
-	a.lockAddresses.RLock()
-	defer a.lockAddresses.RUnlock()
+	a.mutex.RLock()
+	defer a.mutex.RUnlock()
 	return &a.ipAddresses
 }
 
 func (a *AddressHelper) write(addr net.Addr, bool bool) {
-	a.lockAddresses.Lock()
-	defer a.lockAddresses.Unlock()
 	a.ipAddresses[addr] = bool
 }
 
 func (a *AddressHelper) containsAddress(addr net.Addr) bool {
-	a.lockAddresses.RLock()
-	defer a.lockAddresses.RUnlock()
 	_, contains := a.ipAddresses[addr]
 	return contains
 }
 
 func (a *AddressHelper) containsSocket(addr net.Addr) bool {
-	a.lockSockets.RLock()
-	defer a.lockSockets.RUnlock()
 	_, contains := a.sockets[addr]
 	return contains
 }
 
 func (a *AddressHelper) falsifyAddresses() {
-	a.lockAddresses.Lock()
-	defer a.lockAddresses.Unlock()
 	for address := range a.ipAddresses {
 		a.ipAddresses[address] = false
 	}

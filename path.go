@@ -11,7 +11,8 @@ type Path struct {
 	pathID     uint32
 	weight     int
 	owd        uint64
-	conn       *Conn
+	local      net.PacketConn
+	remote     net.Addr
 }
 
 func NewPath(pathId uint32, pconn net.PacketConn, remote net.Addr, weight int) *Path {
@@ -20,7 +21,8 @@ func NewPath(pathId uint32, pconn net.PacketConn, remote net.Addr, weight int) *
 		pathID:     pathId,
 		weight:     weight,
 		owd:        0,
-		conn:       NewConn(pconn, remote),
+		local:      pconn,
+		remote:     remote,
 	}
 }
 
@@ -36,10 +38,6 @@ func (p *Path) setOwd(owd int64) {
 	p.owd = uint64(owd)
 }
 
-func (p *Path) GetConn() *Conn{
-	return p.conn
-}
-
 func (p *Path) contains(address net.Addr) bool {
-	return (p.conn.GetLocal() == address || p.conn.GetRemote() == address)
+	return (p.local.LocalAddr() == address || p.remote == address)
 }
