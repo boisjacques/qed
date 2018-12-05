@@ -42,7 +42,7 @@ func NewSchedulerRoundRobin(session Session, pconn net.PacketConn, remote net.Ad
 	paths[pathZero.pathID] = pathZero
 	pathIds := make([]uint32, 0)
 	pathIds = append(pathIds, pathZero.pathID)
-	return &SchedulerRoundRobin{
+	scheduler := &SchedulerRoundRobin{
 		paths:           paths,
 		session:         session,
 		referenceRTT:    0,
@@ -59,6 +59,8 @@ func NewSchedulerRoundRobin(session Session, pconn net.PacketConn, remote net.Ad
 		totalPathWeight: 1000,
 		isActive:        false,
 	}
+	scheduler.listenOnChannel()
+	return scheduler
 }
 
 func (s *SchedulerRoundRobin) IsInitialized() bool {
@@ -183,7 +185,7 @@ func (s *SchedulerRoundRobin) removePath(pathId uint32) {
 	delete(s.paths, pathId)
 }
 
-func (s *SchedulerRoundRobin) ListenOnChannel() {
+func (s *SchedulerRoundRobin) listenOnChannel() {
 	s.addressHelper.Subscribe(s.addrChan)
 	go func() {
 		oldTime := time.Now().Second()

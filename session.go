@@ -472,6 +472,7 @@ func (s *session) handleHandshakeComplete() {
 		s.queueControlFrame(&wire.PingFrame{})
 		s.sentPacketHandler.SetHandshakeComplete()
 	}
+	s.conn.(*SchedulerRoundRobin).Activate(true)
 }
 
 func (s *session) handlePacketImpl(p *receivedPacket) error {
