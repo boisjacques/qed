@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"github.com/boisjacques/qed/internal/protocol"
 	"github.com/boisjacques/qed/internal/utils"
+	"io"
 	"net"
 )
 
@@ -70,8 +71,12 @@ func parseAddrModFrame(r *bytes.Reader, version protocol.VersionNumber) (*AddrMo
 	}
 	addressVersion = IpVersion(av)
 
-	addr, err := utils.ReadVarInt(r)
+	addrLen, err := utils.ReadVarInt(r)
 	if err != nil {
+		return nil, err
+	}
+	addr := make([]byte, addrLen)
+	if _, err := io.ReadFull(r, addr); err != nil {
 		return nil, err
 	}
 	address, err = net.ResolveUDPAddr("udp", string(addr))
