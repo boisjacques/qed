@@ -131,11 +131,11 @@ func dialContext(
 	if err != nil {
 		return nil, err
 	}
-	c.conn.(*SchedulerRoundRobin).session = c.session
 	c.packetHandlers = packetHandlers
 	if err := c.dial(ctx); err != nil {
 		return nil, err
 	}
+	c.conn.(*SchedulerRoundRobin).session = c.session
 	return c.session, nil
 }
 
