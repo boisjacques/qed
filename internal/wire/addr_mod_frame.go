@@ -45,7 +45,7 @@ func NewAddrModFrame(operation AddressModificationOperation, version IpVersion, 
 	return &AddrModFrame{
 		operation:      operation,
 		addressVersion: version,
-		address:        addr,
+		address:        addr.(*net.UDPAddr),
 	}
 }
 
