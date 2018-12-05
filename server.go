@@ -78,7 +78,16 @@ type server struct {
 	sessionHandler packetHandlerManager
 
 	// set as a member, so they can be set in the tests
-	newSession func(sessionRunner, protocol.ConnectionID /* original Connection ID */, protocol.ConnectionID /* destination Connection ID */, protocol.ConnectionID /* source Connection ID */, *Config, *tls.Config, *handshake.TransportParameters, utils.Logger, protocol.VersionNumber) (quicSession, error)
+	newSession func(Connection,
+		sessionRunner,
+		protocol.ConnectionID /* original Connection ID */,
+		protocol.ConnectionID /* destination Connection ID */,
+		protocol.ConnectionID /* source Connection ID */,
+		*Config,
+		*tls.Config,
+		*handshake.TransportParameters,
+		utils.Logger,
+		protocol.VersionNumber) (quicSession, error)
 
 	serverError error
 	errorChan   chan struct{}
@@ -400,7 +409,9 @@ func (s *server) createNewSession(
 		StatelessResetToken:  bytes.Repeat([]byte{42}, 16),
 		OriginalConnectionID: origDestConnID,
 	}
+	var sess quicSession
 	sess, err := s.newSession(
+		NewSchedulerRoundRobin(sess, s.conn, remoteAddr),
 		s.sessionRunner,
 		clientDestConnID,
 		destConnID,
@@ -411,7 +422,6 @@ func (s *server) createNewSession(
 		s.logger,
 		version,
 	)
-	sess.(*session).AddScheduler(NewScheduler(sess.(*session), s.conn, remoteAddr))
 	if err != nil {
 		return nil, err
 	}
