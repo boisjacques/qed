@@ -6,6 +6,7 @@ import (
 	"github.com/boisjacques/golang-utils"
 	"github.com/boisjacques/qed/internal/wire"
 	"hash/crc32"
+	"log"
 	"net"
 	"sync"
 	"time"
@@ -190,7 +191,8 @@ func (s *SchedulerRoundRobin) listenOnChannel() {
 	go func() {
 		oldTime := time.Now().Second()
 		for {
-			if s.isActive {
+			if s.isActive && s.session != nil {
+
 				addr := <-s.addrChan
 				if !s.containsBlocking(addr, local) {
 					s.write(addr)
@@ -201,6 +203,9 @@ func (s *SchedulerRoundRobin) listenOnChannel() {
 					s.session.(*session).queueControlFrame(s.assembleAddrModFrame(wire.DeleteFrame, addr))
 					s.session.(*session).logger.Debugf("Queued deletion frame for address %s", addr.String())
 				}
+			} else if s.isActive && s.session == nil{
+				log.Fatalf("Uexpected nil session at %s", util.Tracer())
+				panic("Just panic")
 			} else {
 				if time.Now().Second()-oldTime == 10 {
 					s.session.(*session).logger.Debugf("Waiting for connection establishment...")

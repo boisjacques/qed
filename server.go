@@ -409,9 +409,9 @@ func (s *server) createNewSession(
 		StatelessResetToken:  bytes.Repeat([]byte{42}, 16),
 		OriginalConnectionID: origDestConnID,
 	}
-	var sess quicSession
+	sched := NewSchedulerRoundRobin(nil, s.conn, remoteAddr)
 	sess, err := s.newSession(
-		NewSchedulerRoundRobin(sess, s.conn, remoteAddr),
+		sched,
 		s.sessionRunner,
 		clientDestConnID,
 		destConnID,
@@ -425,6 +425,7 @@ func (s *server) createNewSession(
 	if err != nil {
 		return nil, err
 	}
+	sched.session = sess
 	go sess.run()
 	return sess, nil
 }
