@@ -69,8 +69,7 @@ func (a *AddressHelper) gatherAddresses() {
 					} else {
 						if a.containsAddress(udpAddr) {
 							a.write(udpAddr, true)
-						}
-						if !a.containsAddress(udpAddr) {
+						} else if !a.containsAddress(udpAddr) {
 							a.write(udpAddr, true)
 							a.publish(udpAddr)
 						}
@@ -134,8 +133,10 @@ func (a *AddressHelper) containsSocket(addr net.Addr) bool {
 }
 
 func (a *AddressHelper) falsifyAddresses() {
-	for address := range a.ipAddresses {
-		a.ipAddresses[address] = false
+	if len(a.ipAddresses) > 0 {
+		for address := range a.ipAddresses {
+			a.ipAddresses[address] = false
+		}
 	}
 }
 

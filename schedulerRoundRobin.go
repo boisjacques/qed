@@ -85,7 +85,7 @@ func (s *SchedulerRoundRobin) Write(p []byte) error {
 	defer s.lockPaths.RUnlock()
 	path := s.roundRobin()
 
-	_,err := path.local.WriteTo(p, path.remote)
+	_, err := path.local.WriteTo(p, path.remote)
 	if err != nil {
 		fmt.Println(err, util.Tracer())
 		return err
@@ -96,13 +96,13 @@ func (s *SchedulerRoundRobin) Write(p []byte) error {
 	return nil
 }
 
-func (s *SchedulerRoundRobin) Read([]byte) (int, net.Addr, error) {return 0,nil, errors.New("Not implemented yet")}
+func (s *SchedulerRoundRobin) Read([]byte) (int, net.Addr, error) { return 0, nil, errors.New("Not implemented yet") }
 func (s *SchedulerRoundRobin) Close() error {
 	// TODO: Mock close
 	return errors.New("Not implemented yet")
 }
-func (s *SchedulerRoundRobin) LocalAddr() net.Addr {return nil}
-func (s *SchedulerRoundRobin) RemoteAddr() net.Addr {return s.paths[s.lastPath].remote}
+func (s *SchedulerRoundRobin) LocalAddr() net.Addr           { return nil }
+func (s *SchedulerRoundRobin) RemoteAddr() net.Addr          { return s.paths[s.lastPath].remote }
 func (s *SchedulerRoundRobin) SetCurrentRemoteAddr(net.Addr) {}
 
 func (s *SchedulerRoundRobin) roundRobin() *Path {
@@ -187,7 +187,7 @@ func (s *SchedulerRoundRobin) removePath(pathId uint32) {
 }
 
 func (s *SchedulerRoundRobin) listenOnChannel() {
-	for !s.addressHelper.isInitalised{
+	for !s.addressHelper.isInitalised {
 
 	}
 	s.localAddrs = s.addressHelper.ipAddresses
@@ -207,7 +207,7 @@ func (s *SchedulerRoundRobin) listenOnChannel() {
 					s.session.(*session).queueControlFrame(s.assembleAddrModFrame(wire.DeleteFrame, addr))
 					s.session.(*session).logger.Debugf("Queued deletion frame for address %s", addr.String())
 				}
-			} else if s.isActive && s.session == nil{
+			} else if s.isActive && s.session == nil {
 				log.Fatalf("Uexpected nil session at %s", util.Tracer())
 				panic("Just panic")
 			} else {
