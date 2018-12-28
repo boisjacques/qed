@@ -187,6 +187,10 @@ func (s *SchedulerRoundRobin) removePath(pathId uint32) {
 }
 
 func (s *SchedulerRoundRobin) listenOnChannel() {
+	for !s.addressHelper.isInitalised{
+
+	}
+	s.localAddrs = s.addressHelper.ipAddresses
 	s.addressHelper.Subscribe(s.addrChan)
 	go func() {
 		oldTime := time.Now().Second()

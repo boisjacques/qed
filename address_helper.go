@@ -10,10 +10,11 @@ import (
 )
 
 type AddressHelper struct {
-	ipAddresses map[net.Addr]bool
-	sockets     map[net.Addr]net.PacketConn
-	listeners   []chan net.Addr
-	mutex       sync.RWMutex
+	ipAddresses  map[net.Addr]bool
+	sockets      map[net.Addr]net.PacketConn
+	listeners    []chan net.Addr
+	mutex        sync.RWMutex
+	isInitalised bool
 }
 
 var addrHlp *AddressHelper
@@ -78,6 +79,7 @@ func (a *AddressHelper) gatherAddresses() {
 			}
 		}
 	}
+	a.isInitalised = true;
 	if err := a.cleanUp(); err != nil {
 		log.Fatalf("error %s occurred during address handler clean up", err)
 	}
