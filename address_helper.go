@@ -43,9 +43,13 @@ func (a *AddressHelper) Subscribe(c chan net.Addr) {
 }
 
 func (a *AddressHelper) publish(msg net.Addr) {
-	if len(a.listeners) > 0 {
+	if len(a.listeners) > 0 && a.isInitalised {
 		for _, c := range a.listeners {
-			c <- msg
+			select {
+			case c <- msg:
+			default:
+				fmt.Println("No accepting channels")
+			}
 		}
 	}
 }
@@ -78,7 +82,7 @@ func (a *AddressHelper) gatherAddresses() {
 			}
 		}
 	}
-	a.isInitalised = true;
+	a.isInitalised = true
 	if err := a.cleanUp(); err != nil {
 		log.Fatalf("error %s occurred during address handler clean up", err)
 	}
