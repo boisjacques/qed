@@ -55,7 +55,7 @@ func NewSchedulerRoundRobin(session Session, pconn net.PacketConn, remote net.Ad
 		pathIds:         pathIds,
 		lastPath:        0,
 		addressHelper:   GetAddressHelper(),
-		addrChan:        make(chan map[uint32]net.Addr),
+		addrChan:        make(chan map[uint32]net.Addr, 1000),
 		localAddrs:      make(map[uint32]net.Addr),
 		remoteAddrs:     make(map[uint32]net.Addr),
 		sockets:         make(map[uint32]net.PacketConn),
