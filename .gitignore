@@ -9,3 +9,5 @@ example/bin/server/out\.file
 out\.file
 
 key\.pem
+
+example/addressHelperTest/ahTest\.go

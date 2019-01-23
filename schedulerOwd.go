@@ -20,11 +20,17 @@ type SchedulerOwd struct {
 	pathIds         []uint32
 	lastPath        uint32
 	addressHelper   *AddressHelper
-	addrChan        chan net.Addr
-	localAddrs      map[net.Addr]bool
-	remoteAddrs     map[net.Addr]struct{}
+	addrChan        chan map[uint32]net.Addr
+	localAddrs      map[uint32]net.Addr
+	remoteAddrs     map[uint32]net.Addr
+	sockets         map[uint32]net.PacketConn
+	deletionQueue   []net.Addr
+	additionQueue   []net.Addr
 	lockRemote      sync.RWMutex
+	lockLocal       sync.RWMutex
 	lockPaths       sync.RWMutex
+	lockAQ          sync.RWMutex
+	lockDQ          sync.RWMutex
 	isInitialized   bool
 	totalPathWeight int
 	isActive        bool
@@ -51,11 +57,17 @@ func NewSchedulerOwd(session Session, pconn net.PacketConn, remote net.Addr) *Sc
 		pathIds:         pathIds,
 		lastPath:        0,
 		addressHelper:   GetAddressHelper(),
-		addrChan:        make(chan net.Addr),
-		localAddrs:      GetAddressHelper().ipAddresses,
-		remoteAddrs:     make(map[net.Addr]struct{}),
+		addrChan:        make(chan map[uint32]net.Addr),
+		localAddrs:      make(map[uint32]net.Addr),
+		remoteAddrs:     make(map[uint32]net.Addr),
+		sockets:         make(map[uint32]net.PacketConn),
+		deletionQueue:   make([]net.Addr, 0),
+		additionQueue:   make([]net.Addr, 0),
 		lockRemote:      sync.RWMutex{},
+		lockLocal:       sync.RWMutex{},
 		lockPaths:       sync.RWMutex{},
+		lockAQ:          sync.RWMutex{},
+		lockDQ:          sync.RWMutex{},
 		isInitialized:   false,
 		totalPathWeight: 1000,
 		isActive:        false,
@@ -105,7 +117,7 @@ func (s *SchedulerOwd) SetCurrentRemoteAddr(net.Addr) {}
 
 // TODO: Implement proper source address handling
 func (s *SchedulerOwd) newPath(local, remote net.Addr) {
-	usock, err := s.addressHelper.openSocket(local)
+	usock, err := s.openSocket(local)
 	if err != nil {
 		s.session.(*session).logger.Errorf("Path could not be created because of %s", err)
 		return
@@ -124,7 +136,7 @@ func (s *SchedulerOwd) newPath(local, remote net.Addr) {
 }
 
 func (s *SchedulerOwd) addLocalAddress(local net.Addr) {
-	for remote := range s.remoteAddrs {
+	for _,remote := range s.remoteAddrs {
 		if isSameVersion(local, remote) {
 			s.newPath(local, remote)
 		}
@@ -132,27 +144,24 @@ func (s *SchedulerOwd) addLocalAddress(local net.Addr) {
 }
 
 func (s *SchedulerOwd) addRemoteAddress(addr net.Addr) {
-	if !s.containsBlocking(addr, remote) {
-		s.remoteAddrs[addr] = struct{}{}
-		s.addressHelper.mutex.RLock()
-		defer s.addressHelper.mutex.RUnlock()
-		for laddr := range s.localAddrs {
+	checksum := CRC(addr)
+	if !s.containsBlocking(checksum, remote) {
+		s.remoteAddrs[checksum] = addr
+		s.lockLocal.RLock()
+		defer s.lockLocal.RUnlock()
+		for _,laddr := range s.localAddrs {
 			if isSameVersion(laddr, addr) {
 				s.newPath(laddr, addr)
 			}
-		}
-		remoteAdded := true
-		if remoteAdded {
-			//For breakpoints only
 		}
 	}
 }
 
 func (s *SchedulerOwd) removeAddress(address net.Addr) {
-	if s.containsBlocking(address, remote) {
+	if s.containsBlocking(CRC(address), remote) {
 		s.delete(address, remote)
 	}
-	if s.containsBlocking(address, local) {
+	if s.containsBlocking(CRC(address), local) {
 		s.delete(address, local)
 	}
 	for k, v := range s.paths {
@@ -160,21 +169,6 @@ func (s *SchedulerOwd) removeAddress(address net.Addr) {
 			s.removePath(k)
 		}
 	}
-}
-
-func (s *SchedulerOwd) initializePaths() {
-	s.addressHelper.mutex.RLock()
-	s.lockRemote.RLock()
-	defer s.addressHelper.mutex.RUnlock()
-	defer s.lockRemote.RUnlock()
-	for local := range s.localAddrs {
-		for remote := range s.remoteAddrs {
-			if isSameVersion(local, remote) {
-				s.newPath(local, remote)
-			}
-		}
-	}
-	s.isInitialized = true
 }
 
 func (s *SchedulerOwd) GetPathZero() *Path {
@@ -185,30 +179,80 @@ func (s *SchedulerOwd) removePath(pathId uint32) {
 	delete(s.paths, pathId)
 }
 
-func (s *SchedulerOwd) ListenOnChannel() {
+func (s *SchedulerOwd) listenOnChannel() {
 	s.addressHelper.Subscribe(s.addrChan)
-	go func() {
-		oldTime := time.Now().Second()
-		for {
-			if s.isActive {
-				addr := <-s.addrChan
-				if !s.containsBlocking(addr, local) {
-					s.write(addr)
-					s.session.(*session).queueControlFrame(s.assembleAddrModFrame(wire.AddFrame, addr))
-					s.session.(*session).logger.Debugf("Queued addition frame for address %s", addr.String())
-				} else {
-					s.delete(addr, local)
-					s.session.(*session).queueControlFrame(s.assembleAddrModFrame(wire.DeleteFrame, addr))
-					s.session.(*session).logger.Debugf("Queued deletion frame for address %s", addr.String())
-				}
-			} else {
-				if time.Now().Second()-oldTime == 10 {
-					s.session.(*session).logger.Debugf("Waiting for connection establishment...")
-					oldTime = time.Now().Second()
-				}
+	go s.addressSubscriber()
+	go s.queueHandler()
+}
+
+func (s *SchedulerOwd) addressSubscriber() {
+	for !s.addressHelper.isInitalised {
+
+	}
+	for {
+		addrs := <-s.addrChan
+		for key, addr := range addrs {
+			if !s.containsBlocking(key, local) {
+				s.lockAQ.Lock()
+				s.additionQueue = append(s.additionQueue, addr)
+				s.lockAQ.Unlock()
 			}
 		}
-	}()
+		s.lockLocal.RLock()
+		for key, addr := range s.localAddrs {
+			_, contains := addrs[key]
+			if !contains {
+				s.lockDQ.Lock()
+				s.deletionQueue = append(s.deletionQueue, addr)
+				s.lockDQ.Unlock()
+			}
+		}
+		s.lockLocal.RUnlock()
+		s.lockLocal.Lock()
+		s.localAddrs = make(map[uint32]net.Addr)
+		for key, value := range addrs {
+			s.localAddrs[key] = value
+		}
+		s.lockLocal.Unlock()
+
+	}
+}
+
+func (s *SchedulerOwd) queueHandler() {
+	for {
+		s.processAdditionQueue()
+		s.processDeletionQueue()
+	}
+}
+
+func (s *SchedulerOwd) processAdditionQueue() {
+	s.lockAQ.Lock()
+	defer s.lockAQ.Unlock()
+	if len(s.additionQueue) > 0 {
+		addr := s.additionQueue[0]
+		s.addLocalAddress(addr)
+		s.session.(*session).queueControlFrame(s.assembleAddrModFrame(wire.AddFrame, addr))
+		s.session.(*session).logger.Debugf("Queued addition frame for address %s", addr.String())
+		s.additionQueue[0] = nil
+		s.additionQueue = s.additionQueue[1:]
+	}
+}
+
+func (s *SchedulerOwd) processDeletionQueue() {
+	s.lockDQ.Lock()
+	defer s.lockDQ.Unlock()
+	if len(s.deletionQueue) > 0 {
+		addr := s.deletionQueue[0]
+		s.session.(*session).queueControlFrame(s.assembleAddrModFrame(wire.DeleteFrame, addr))
+		s.session.(*session).logger.Debugf("Queued deletion frame for address %s", addr.String())
+		for pathID, path := range s.paths {
+			if path.contains(addr) {
+				s.removePath(pathID)
+			}
+		}
+		s.deletionQueue[0] = nil
+		s.deletionQueue = s.deletionQueue[1:]
+	}
 }
 
 func (s *SchedulerOwd) assembleAddrModFrame(operation wire.AddressModificationOperation, addr net.Addr) *wire.AddrModFrame {
@@ -228,16 +272,16 @@ func (s *SchedulerOwd) assembleOwdFrame(pathId uint32) *wire.OwdFrame {
 }
 
 
-func (s *SchedulerOwd) containsBlocking(addr net.Addr, direcion direcionAddr) bool {
+func (s *SchedulerOwd) containsBlocking(key uint32, direcion direcionAddr) bool {
 	var contains bool
 	if direcion == local {
-		s.addressHelper.mutex.RLock()
-		defer s.addressHelper.mutex.RUnlock()
-		_, contains = s.localAddrs[addr]
+		s.lockLocal.Lock()
+		_, contains = s.localAddrs[key]
+		s.lockLocal.Unlock()
 	} else if direcion == remote {
 		s.lockRemote.Lock()
-		defer s.lockRemote.Unlock()
-		_, contains = s.remoteAddrs[addr]
+		_, contains = s.remoteAddrs[key]
+		s.lockRemote.Unlock()
 	}
 	return contains
 }
@@ -249,14 +293,14 @@ func (s *SchedulerOwd) delete(addr net.Addr, direction direcionAddr) {
 		}
 	}
 	if direction == local {
-		s.addressHelper.mutex.Lock()
-		defer s.addressHelper.mutex.Unlock()
-		delete(s.localAddrs, addr)
+		s.lockLocal.Lock()
+		delete(s.localAddrs, CRC(addr))
+		s.lockLocal.Unlock()
 	}
 	if direction == remote {
 		s.lockRemote.Lock()
-		defer s.lockRemote.Unlock()
-		delete(s.remoteAddrs, addr)
+		delete(s.remoteAddrs, CRC(addr))
+		s.lockRemote.Unlock()
 	}
 }
 
@@ -264,12 +308,6 @@ func (s *SchedulerOwd) deletePath(pathId uint32) {
 	s.lockPaths.Lock()
 	defer s.lockPaths.Unlock()
 	delete(s.paths, pathId)
-}
-
-func (s *SchedulerOwd) write(addr net.Addr) {
-	s.addressHelper.mutex.Lock()
-	defer s.addressHelper.mutex.Unlock()
-	s.localAddrs[addr] = false
 }
 
 func (s *SchedulerOwd) setOwd(pathID uint32, owd int64) {
@@ -369,14 +407,14 @@ func (s *SchedulerOwd) calculateAverageOwd() uint64 {
 	return aOwd
 }
 
-func (s *SchedulerOwd) announceAddresses() {
-	go func() {
-		for !s.isActive {
 
-		}
-		for addr := range s.localAddrs {
-			s.session.(*session).queueControlFrame(s.assembleAddrModFrame(wire.AddFrame, addr))
-			s.session.(*session).logger.Debugf("Queued addition frame for address %s", addr.String())
-		}
-	}()
+
+func (s *SchedulerOwd) openSocket(local net.Addr) (net.PacketConn, error) {
+	var err error = nil
+	usock, contains := s.sockets[CRC(local)]
+	if !contains {
+		usock, err = net.ListenUDP("udp", local.(*net.UDPAddr))
+		s.sockets[CRC(local)] = usock
+	}
+	return usock, err
 }

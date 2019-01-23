@@ -170,21 +170,6 @@ func (s *SchedulerRoundRobin) removeAddress(address net.Addr) {
 	}
 }
 
-func (s *SchedulerRoundRobin) initializePaths() {
-	s.lockLocal.RLock()
-	s.lockRemote.RLock()
-	defer s.lockLocal.RUnlock()
-	defer s.lockRemote.RUnlock()
-	for _,local := range s.localAddrs {
-		for _,remote := range s.remoteAddrs {
-			if isSameVersion(local, remote) {
-				s.newPath(local, remote)
-			}
-		}
-	}
-	s.isInitialized = true
-}
-
 func (s *SchedulerRoundRobin) GetPathZero() *Path {
 	return s.pathZero
 }
