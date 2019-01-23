@@ -719,7 +719,10 @@ func (s *session) handleOneWayDelayFrame(frame *wire.OwdFrame) error {
 }
 
 func (s *session) handleOneWayDelayAckFrame(frame *wire.OwdAckFrame) error {
-	s.conn.(*SchedulerRoundRobin).setOwd(frame.PathID(), frame.Owd())
+	err := s.conn.(*SchedulerRoundRobin).setOwd(frame.PathID(), frame.Owd())
+	if err != nil {
+		return err
+	}
 	return nil
 }
 

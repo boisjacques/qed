@@ -2,6 +2,7 @@ package quic
 
 import (
 	"fmt"
+	"hash/crc32"
 	"log"
 	"net"
 	"strings"
@@ -10,9 +11,8 @@ import (
 )
 
 type AddressHelper struct {
-	ipAddresses  map[net.Addr]bool
-	sockets      map[net.Addr]net.PacketConn
-	listeners    []chan net.Addr
+	ipAddresses  map[uint32]net.Addr
+	listeners    []chan map[uint32]net.Addr
 	mutex        sync.RWMutex
 	isInitalised bool
 }
@@ -23,9 +23,8 @@ var once sync.Once
 func GetAddressHelper() *AddressHelper {
 	once.Do(func() {
 		addrHlp = &AddressHelper{
-			ipAddresses: make(map[net.Addr]bool),
-			sockets:     make(map[net.Addr]net.PacketConn),
-			listeners:   make([]chan net.Addr, 0),
+			ipAddresses: make(map[uint32]net.Addr),
+			listeners:   make([]chan map[uint32]net.Addr, 0),
 			mutex:       sync.RWMutex{},
 		}
 		go func() {
@@ -38,11 +37,11 @@ func GetAddressHelper() *AddressHelper {
 	return addrHlp
 }
 
-func (a *AddressHelper) Subscribe(c chan net.Addr) {
+func (a *AddressHelper) Subscribe(c chan map[uint32]net.Addr) {
 	a.listeners = append(a.listeners, c)
 }
 
-func (a *AddressHelper) publish(msg net.Addr) {
+func (a *AddressHelper) publish(msg map[uint32]net.Addr) {
 	if len(a.listeners) > 0 && a.isInitalised {
 		for _, c := range a.listeners {
 			select {
@@ -55,7 +54,9 @@ func (a *AddressHelper) publish(msg net.Addr) {
 }
 
 func (a *AddressHelper) gatherAddresses() {
-	a.falsifyAddresses()
+	a.mutex.Lock()
+	defer a.mutex.Unlock()
+	a.ipAddresses = make(map[uint32]net.Addr)
 	interfaces, _ := net.Interfaces()
 	for _, iface := range interfaces {
 		flags := iface.Flags.String()
@@ -71,77 +72,39 @@ func (a *AddressHelper) gatherAddresses() {
 					if err != nil {
 						log.Println(err)
 					} else {
-						if a.containsAddress(udpAddr) {
-							a.write(udpAddr, true)
-						} else if !a.containsAddress(udpAddr) {
-							a.write(udpAddr, true)
-							a.publish(udpAddr)
-						}
+						a.write(udpAddr)
 					}
+
 				}
 			}
 		}
 	}
 	a.isInitalised = true
-	if err := a.cleanUp(); err != nil {
-		log.Fatalf("error %s occurred during address handler clean up", err)
-	}
+	a.publish(a.ipAddresses)
 }
 
-func (a *AddressHelper) openSocket(local net.Addr) (net.PacketConn, error) {
-	var err error = nil
-	usock, contains := a.sockets[local]
-	if !contains {
-		usock, err = net.ListenUDP("udp", local.(*net.UDPAddr))
-		a.sockets[local] = usock
-	}
-	return usock, err
-}
 
-func (a *AddressHelper) cleanUp() error {
-	for key, value := range a.ipAddresses {
-		if value == false {
-			a.publish(key)
-			time.Sleep(100 * time.Millisecond) //Wait 100 ms for handling in scheduler
-			if a.containsSocket(key) {
-				err := a.sockets[key].Close()
-				if err != nil {
-					fmt.Println(err)
-					return err
-				}
-			}
-			delete(a.ipAddresses, key)
-		}
-	}
-	return nil
-}
 
-func (a *AddressHelper) GetAddresses() *map[net.Addr]bool {
+
+func (a *AddressHelper) GetAddresses() *map[uint32]net.Addr{
 	a.mutex.RLock()
 	defer a.mutex.RUnlock()
 	return &a.ipAddresses
 }
 
-func (a *AddressHelper) write(addr net.Addr, bool bool) {
-	a.ipAddresses[addr] = bool
+func (a *AddressHelper) write(addr net.Addr) {
+	checksum := crc32.ChecksumIEEE([]byte(addr.String()))
+	a.ipAddresses[checksum] = addr
 }
 
 func (a *AddressHelper) containsAddress(addr net.Addr) bool {
-	_, contains := a.ipAddresses[addr]
+	checksum := crc32.ChecksumIEEE([]byte(addr.String()))
+	_, contains := a.ipAddresses[checksum]
 	return contains
 }
 
-func (a *AddressHelper) containsSocket(addr net.Addr) bool {
-	_, contains := a.sockets[addr]
-	return contains
-}
-
-func (a *AddressHelper) falsifyAddresses() {
-	if len(a.ipAddresses) > 0 {
-		for address := range a.ipAddresses {
-			a.ipAddresses[address] = false
-		}
-	}
+func (a *AddressHelper) GetMutex() *sync.RWMutex {
+	return &a.mutex
 }
 
 func isLinkLocal(addr string) bool {
@@ -157,4 +120,8 @@ func isLinkLocal(addr string) bool {
 	} else {
 		return false
 	}
+}
+
+func CRC(addr net.Addr) uint32 {
+	return crc32.ChecksumIEEE([]byte(addr.String()))
 }
