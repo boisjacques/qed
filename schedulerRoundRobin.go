@@ -219,8 +219,10 @@ func (s *SchedulerRoundRobin) addressSubscriber() {
 
 func (s *SchedulerRoundRobin) queueHandler() {
 	for {
-		s.processAdditionQueue()
-		s.processDeletionQueue()
+		if s.isActive && s.session != nil {
+			s.processAdditionQueue()
+			s.processDeletionQueue()
+		}
 	}
 }
 
