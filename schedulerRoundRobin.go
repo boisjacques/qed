@@ -180,8 +180,11 @@ func (s *SchedulerRoundRobin) removePath(pathId uint32) {
 
 func (s *SchedulerRoundRobin) listenOnChannel() {
 	s.addressHelper.Subscribe(s.addrChan)
+	s.session.(*session).logger.Debugf("Subscribed to channel")
 	go s.addressSubscriber()
+	s.session.(*session).logger.Debugf("Started address subscriber")
 	go s.queueHandler()
+	s.session.(*session).logger.Debugf("Started queue handler")
 }
 
 func (s *SchedulerRoundRobin) addressSubscriber() {
