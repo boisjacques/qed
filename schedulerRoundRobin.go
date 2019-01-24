@@ -198,8 +198,7 @@ func (s *SchedulerRoundRobin) addressSubscriber() {
 		}
 	}
 	godbg.Dbg("Address helper up and running")
-	for {
-		addrs := <-s.addrChan
+	for addrs := range s.addrChan {
 		for key, addr := range addrs {
 			if !s.containsBlocking(key, local) {
 				s.lockAQ.Lock()

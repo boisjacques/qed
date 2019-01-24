@@ -1,7 +1,6 @@
 package quic
 
 import (
-	"github.com/sasha-s/go-deadlock"
 	"github.com/tylerwince/godbg"
 	"hash/crc32"
 	"log"
@@ -14,7 +13,6 @@ import (
 type AddressHelper struct {
 	ipAddresses  map[uint32]net.Addr
 	listeners    []chan map[uint32]net.Addr
-	mutex        deadlock.RWMutex
 	isInitalised bool
 }
 
@@ -26,7 +24,6 @@ func GetAddressHelper() *AddressHelper {
 		addrHlp = &AddressHelper{
 			ipAddresses: make(map[uint32]net.Addr),
 			listeners:   make([]chan map[uint32]net.Addr, 0),
-			mutex:       deadlock.RWMutex{},
 		}
 		go func() {
 			for {
@@ -56,8 +53,6 @@ func (a *AddressHelper) publish(msg map[uint32]net.Addr) {
 }
 
 func (a *AddressHelper) gatherAddresses() {
-	a.mutex.Lock()
-	defer a.mutex.Unlock()
 	a.ipAddresses = make(map[uint32]net.Addr)
 	interfaces, _ := net.Interfaces()
 	for _, iface := range interfaces {
@@ -85,11 +80,6 @@ func (a *AddressHelper) gatherAddresses() {
 	a.publish(a.ipAddresses)
 }
 
-func (a *AddressHelper) GetAddresses() *map[uint32]net.Addr {
-	a.mutex.RLock()
-	defer a.mutex.RUnlock()
-	return &a.ipAddresses
-}
 
 func (a *AddressHelper) write(addr net.Addr) {
 	checksum := crc32.ChecksumIEEE([]byte(addr.String()))
@@ -100,10 +90,6 @@ func (a *AddressHelper) containsAddress(addr net.Addr) bool {
 	checksum := crc32.ChecksumIEEE([]byte(addr.String()))
 	_, contains := a.ipAddresses[checksum]
 	return contains
-}
-
-func (a *AddressHelper) GetMutex() *deadlock.RWMutex {
-	return &a.mutex
 }
 
 func isLinkLocal(addr string) bool {
