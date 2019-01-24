@@ -2,6 +2,7 @@ package quic
 
 import (
 	"fmt"
+	"github.com/sasha-s/go-deadlock"
 	"hash/crc32"
 	"log"
 	"net"
@@ -13,7 +14,7 @@ import (
 type AddressHelper struct {
 	ipAddresses  map[uint32]net.Addr
 	listeners    []chan map[uint32]net.Addr
-	mutex        sync.RWMutex
+	mutex        deadlock.RWMutex
 	isInitalised bool
 }
 
@@ -25,7 +26,7 @@ func GetAddressHelper() *AddressHelper {
 		addrHlp = &AddressHelper{
 			ipAddresses: make(map[uint32]net.Addr),
 			listeners:   make([]chan map[uint32]net.Addr, 0),
-			mutex:       sync.RWMutex{},
+			mutex:       deadlock.RWMutex{},
 		}
 		go func() {
 			for {
@@ -83,10 +84,7 @@ func (a *AddressHelper) gatherAddresses() {
 	a.publish(a.ipAddresses)
 }
 
-
-
-
-func (a *AddressHelper) GetAddresses() *map[uint32]net.Addr{
+func (a *AddressHelper) GetAddresses() *map[uint32]net.Addr {
 	a.mutex.RLock()
 	defer a.mutex.RUnlock()
 	return &a.ipAddresses
@@ -103,7 +101,7 @@ func (a *AddressHelper) containsAddress(addr net.Addr) bool {
 	return contains
 }
 
-func (a *AddressHelper) GetMutex() *sync.RWMutex {
+func (a *AddressHelper) GetMutex() *deadlock.RWMutex {
 	return &a.mutex
 }
 

@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"github.com/boisjacques/golang-utils"
 	"github.com/boisjacques/qed/internal/wire"
+	"github.com/sasha-s/go-deadlock"
 	"hash/crc32"
 	"net"
-	"sync"
 )
 
 type SchedulerRoundRobin struct {
@@ -24,11 +24,11 @@ type SchedulerRoundRobin struct {
 	sockets         map[uint32]net.PacketConn
 	deletionQueue   []net.Addr
 	additionQueue   []net.Addr
-	lockRemote      sync.RWMutex
-	lockLocal       sync.RWMutex
-	lockPaths       sync.RWMutex
-	lockAQ          sync.RWMutex
-	lockDQ          sync.RWMutex
+	lockRemote      deadlock.RWMutex
+	lockLocal       deadlock.RWMutex
+	lockPaths       deadlock.RWMutex
+	lockAQ          deadlock.RWMutex
+	lockDQ          deadlock.RWMutex
 	isInitialized   bool
 	totalPathWeight int
 	isActive        bool
@@ -61,11 +61,11 @@ func NewSchedulerRoundRobin(session Session, pconn net.PacketConn, remote net.Ad
 		sockets:         make(map[uint32]net.PacketConn),
 		deletionQueue:   make([]net.Addr, 0),
 		additionQueue:   make([]net.Addr, 0),
-		lockRemote:      sync.RWMutex{},
-		lockLocal:       sync.RWMutex{},
-		lockPaths:       sync.RWMutex{},
-		lockAQ:          sync.RWMutex{},
-		lockDQ:          sync.RWMutex{},
+		lockRemote:      deadlock.RWMutex{},
+		lockLocal:       deadlock.RWMutex{},
+		lockPaths:       deadlock.RWMutex{},
+		lockAQ:          deadlock.RWMutex{},
+		lockDQ:          deadlock.RWMutex{},
 		isInitialized:   false,
 		totalPathWeight: 1000,
 		isActive:        false,
