@@ -137,7 +137,7 @@ func (s *SchedulerRoundRobin) newPath(local, remote net.Addr) {
 }
 
 func (s *SchedulerRoundRobin) addLocalAddress(local net.Addr) {
-	for _,remote := range s.remoteAddrs {
+	for _, remote := range s.remoteAddrs {
 		if isSameVersion(local, remote) {
 			s.newPath(local, remote)
 		}
@@ -150,7 +150,7 @@ func (s *SchedulerRoundRobin) addRemoteAddress(addr net.Addr) {
 		s.remoteAddrs[checksum] = addr
 		s.lockLocal.RLock()
 		defer s.lockLocal.RUnlock()
-		for _,laddr := range s.localAddrs {
+		for _, laddr := range s.localAddrs {
 			if isSameVersion(laddr, addr) {
 				s.newPath(laddr, addr)
 			}
@@ -190,35 +190,43 @@ func (s *SchedulerRoundRobin) listenOnChannel() {
 }
 
 func (s *SchedulerRoundRobin) addressSubscriber() {
+	i := 0
 	for !s.addressHelper.isInitalised {
-
+		i++
+		if i%1000 == 0 {
+			godbg.Dbg("Waiting for session establishment")
+		}
 	}
+	godbg.Dbg("Session established")
 	for {
-		addrs := <-s.addrChan
-		for key, addr := range addrs {
-			if !s.containsBlocking(key, local) {
-				s.lockAQ.Lock()
-				s.additionQueue = append(s.additionQueue, addr)
-				s.lockAQ.Unlock()
+		select {
+		case addrs := <-s.addrChan:
+			for key, addr := range addrs {
+				if !s.containsBlocking(key, local) {
+					s.lockAQ.Lock()
+					s.additionQueue = append(s.additionQueue, addr)
+					s.lockAQ.Unlock()
+				}
 			}
-		}
-		s.lockLocal.RLock()
-		for key, addr := range s.localAddrs {
-			_, contains := addrs[key]
-			if !contains {
-				s.lockDQ.Lock()
-				s.deletionQueue = append(s.deletionQueue, addr)
-				s.lockDQ.Unlock()
+			s.lockLocal.RLock()
+			for key, addr := range s.localAddrs {
+				_, contains := addrs[key]
+				if !contains {
+					s.lockDQ.Lock()
+					s.deletionQueue = append(s.deletionQueue, addr)
+					s.lockDQ.Unlock()
+				}
 			}
-		}
-		s.lockLocal.RUnlock()
-		s.lockLocal.Lock()
-		s.localAddrs = make(map[uint32]net.Addr)
-		for key, value := range addrs {
-			s.localAddrs[key] = value
-		}
-		s.lockLocal.Unlock()
+			s.lockLocal.RUnlock()
+			s.lockLocal.Lock()
+			s.localAddrs = make(map[uint32]net.Addr)
+			for key, value := range addrs {
+				s.localAddrs[key] = value
+			}
+			s.lockLocal.Unlock()
+		default:
 
+		}
 	}
 }
 
