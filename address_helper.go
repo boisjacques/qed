@@ -1,8 +1,8 @@
 package quic
 
 import (
-	"fmt"
 	"github.com/sasha-s/go-deadlock"
+	"github.com/tylerwince/godbg"
 	"hash/crc32"
 	"log"
 	"net"
@@ -47,8 +47,9 @@ func (a *AddressHelper) publish(msg map[uint32]net.Addr) {
 		for _, c := range a.listeners {
 			select {
 			case c <- msg:
+				godbg.Dbg(msg)
 			default:
-				fmt.Println("No accepting channels")
+				godbg.Dbg("No accepting channels")
 			}
 		}
 	}

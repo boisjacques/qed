@@ -194,39 +194,35 @@ func (s *SchedulerRoundRobin) addressSubscriber() {
 	for !s.addressHelper.isInitalised {
 		i++
 		if i%1000 == 0 {
-			godbg.Dbg("Waiting for session establishment")
+			godbg.Dbg("Waiting for address helper")
 		}
 	}
-	godbg.Dbg("Session established")
+	godbg.Dbg("Address helper up and running")
 	for {
-		select {
-		case addrs := <-s.addrChan:
-			for key, addr := range addrs {
-				if !s.containsBlocking(key, local) {
-					s.lockAQ.Lock()
-					s.additionQueue = append(s.additionQueue, addr)
-					s.lockAQ.Unlock()
-				}
+		addrs := <-s.addrChan
+		for key, addr := range addrs {
+			if !s.containsBlocking(key, local) {
+				s.lockAQ.Lock()
+				s.additionQueue = append(s.additionQueue, addr)
+				s.lockAQ.Unlock()
 			}
-			s.lockLocal.RLock()
-			for key, addr := range s.localAddrs {
-				_, contains := addrs[key]
-				if !contains {
-					s.lockDQ.Lock()
-					s.deletionQueue = append(s.deletionQueue, addr)
-					s.lockDQ.Unlock()
-				}
-			}
-			s.lockLocal.RUnlock()
-			s.lockLocal.Lock()
-			s.localAddrs = make(map[uint32]net.Addr)
-			for key, value := range addrs {
-				s.localAddrs[key] = value
-			}
-			s.lockLocal.Unlock()
-		default:
-
 		}
+		s.lockLocal.RLock()
+		for key, addr := range s.localAddrs {
+			_, contains := addrs[key]
+			if !contains {
+				s.lockDQ.Lock()
+				s.deletionQueue = append(s.deletionQueue, addr)
+				s.lockDQ.Unlock()
+			}
+		}
+		s.lockLocal.RUnlock()
+		s.lockLocal.Lock()
+		s.localAddrs = make(map[uint32]net.Addr)
+		for key, value := range addrs {
+			s.localAddrs[key] = value
+		}
+		s.lockLocal.Unlock()
 	}
 }
 
