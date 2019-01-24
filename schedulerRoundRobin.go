@@ -6,6 +6,7 @@ import (
 	"github.com/boisjacques/golang-utils"
 	"github.com/boisjacques/qed/internal/wire"
 	"github.com/sasha-s/go-deadlock"
+	"github.com/tylerwince/godbg"
 	"hash/crc32"
 	"net"
 )
@@ -71,6 +72,7 @@ func NewSchedulerRoundRobin(session Session, pconn net.PacketConn, remote net.Ad
 		isActive:        false,
 	}
 	scheduler.listenOnChannel()
+	godbg.Dbg("Scheduler up and running")
 	return scheduler
 }
 
@@ -180,11 +182,11 @@ func (s *SchedulerRoundRobin) removePath(pathId uint32) {
 
 func (s *SchedulerRoundRobin) listenOnChannel() {
 	s.addressHelper.Subscribe(s.addrChan)
-	s.session.(*session).logger.Debugf("Subscribed to channel")
+	godbg.Dbg("Subscribed to channel")
 	go s.addressSubscriber()
-	s.session.(*session).logger.Debugf("Started address subscriber")
+	godbg.Dbg("Started address subscriber")
 	go s.queueHandler()
-	s.session.(*session).logger.Debugf("Started queue handler")
+	godbg.Dbg("Started queue handler")
 }
 
 func (s *SchedulerRoundRobin) addressSubscriber() {
