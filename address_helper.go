@@ -1,13 +1,10 @@
 package quic
 
 import (
-	"github.com/tylerwince/godbg"
 	"hash/crc32"
 	"log"
 	"net"
 	"strings"
-	"sync"
-	"time"
 )
 
 type AddressHelper struct {
@@ -16,42 +13,15 @@ type AddressHelper struct {
 	isInitalised bool
 }
 
-var addrHlp *AddressHelper
-var once sync.Once
+func NewAddressHelper() *AddressHelper {
+	addrHlp := &AddressHelper{
+		ipAddresses: make(map[uint32]net.Addr),
+		listeners:   make([]chan map[uint32]net.Addr, 0),
+	}
+	addrHlp.gatherAddresses()
 
-func GetAddressHelper() *AddressHelper {
-	once.Do(func() {
-		addrHlp = &AddressHelper{
-			ipAddresses: make(map[uint32]net.Addr),
-			listeners:   make([]chan map[uint32]net.Addr, 0),
-		}
-		go func() {
-			for {
-				addrHlp.gatherAddresses()
-				time.Sleep(100 * time.Millisecond)
-			}
-		}()
-	})
 	return addrHlp
 }
-
-func (a *AddressHelper) Subscribe(c chan map[uint32]net.Addr) {
-	a.listeners = append(a.listeners, c)
-}
-
-func (a *AddressHelper) publish(msg map[uint32]net.Addr) {
-	if len(a.listeners) > 0 && a.isInitalised {
-		for _, c := range a.listeners {
-			select {
-			case c <- msg:
-				godbg.Dbg(msg)
-			default:
-				godbg.Dbg("No accepting channels")
-			}
-		}
-	}
-}
-
 func (a *AddressHelper) gatherAddresses() {
 	a.ipAddresses = make(map[uint32]net.Addr)
 	interfaces, _ := net.Interfaces()
@@ -77,9 +47,11 @@ func (a *AddressHelper) gatherAddresses() {
 		}
 	}
 	a.isInitalised = true
-	a.publish(a.ipAddresses)
 }
 
+func (a *AddressHelper) GetAddresses() map[uint32]net.Addr {
+	return a.ipAddresses
+}
 
 func (a *AddressHelper) write(addr net.Addr) {
 	checksum := crc32.ChecksumIEEE([]byte(addr.String()))

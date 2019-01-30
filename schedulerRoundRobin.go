@@ -23,13 +23,9 @@ type SchedulerRoundRobin struct {
 	localAddrs      map[uint32]net.Addr
 	remoteAddrs     map[uint32]net.Addr
 	sockets         map[uint32]net.PacketConn
-	deletionQueue   []net.Addr
-	additionQueue   []net.Addr
 	lockRemote      deadlock.RWMutex
 	lockLocal       deadlock.RWMutex
 	lockPaths       deadlock.RWMutex
-	lockAQ          deadlock.RWMutex
-	lockDQ          deadlock.RWMutex
 	isInitialized   bool
 	totalPathWeight int
 	isActive        bool
@@ -55,23 +51,23 @@ func NewSchedulerRoundRobin(session Session, pconn net.PacketConn, remote net.Ad
 		pathZero:        pathZero,
 		pathIds:         pathIds,
 		lastPath:        0,
-		addressHelper:   GetAddressHelper(),
+		addressHelper:   NewAddressHelper(),
 		addrChan:        make(chan map[uint32]net.Addr, 1000),
 		localAddrs:      make(map[uint32]net.Addr),
 		remoteAddrs:     make(map[uint32]net.Addr),
 		sockets:         make(map[uint32]net.PacketConn),
-		deletionQueue:   make([]net.Addr, 0),
-		additionQueue:   make([]net.Addr, 0),
 		lockRemote:      deadlock.RWMutex{},
 		lockLocal:       deadlock.RWMutex{},
 		lockPaths:       deadlock.RWMutex{},
-		lockAQ:          deadlock.RWMutex{},
-		lockDQ:          deadlock.RWMutex{},
 		isInitialized:   false,
 		totalPathWeight: 1000,
 		isActive:        false,
 	}
-	scheduler.listenOnChannel()
+	for !scheduler.addressHelper.isInitalised {
+
+	}
+	scheduler.localAddrs = scheduler.addressHelper.GetAddresses()
+	go scheduler.announceAddresses()
 	godbg.Dbg("Scheduler up and running")
 	return scheduler
 }
@@ -180,87 +176,15 @@ func (s *SchedulerRoundRobin) removePath(pathId uint32) {
 	delete(s.paths, pathId)
 }
 
-func (s *SchedulerRoundRobin) listenOnChannel() {
-	s.addressHelper.Subscribe(s.addrChan)
-	godbg.Dbg("Subscribed to channel")
-	go s.addressSubscriber()
-	godbg.Dbg("Started address subscriber")
-	go s.queueHandler()
-	godbg.Dbg("Started queue handler")
-}
+func (s *SchedulerRoundRobin) announceAddresses() {
+	for !s.session.(*session).handshakeComplete {
 
-func (s *SchedulerRoundRobin) addressSubscriber() {
-	i := 0
-	for !s.addressHelper.isInitalised {
-		i++
-		if i%1000 == 0 {
-			godbg.Dbg("Waiting for address helper")
-		}
 	}
-	godbg.Dbg("Address helper up and running")
-	for addrs := range s.addrChan {
-		for key, addr := range addrs {
-			if !s.containsBlocking(key, local) {
-				s.lockAQ.Lock()
-				s.additionQueue = append(s.additionQueue, addr)
-				s.lockAQ.Unlock()
-			}
+	for _, addr := range s.localAddrs {
+		if addr != s.pathZero.local.LocalAddr() {
+			s.session.(*session).queueControlFrame(s.assembleAddrModFrame(wire.AddFrame, addr))
+			s.session.(*session).logger.Debugf("Queued addition frame for address %s", addr.String())
 		}
-		s.lockLocal.RLock()
-		for key, addr := range s.localAddrs {
-			_, contains := addrs[key]
-			if !contains {
-				s.lockDQ.Lock()
-				s.deletionQueue = append(s.deletionQueue, addr)
-				s.lockDQ.Unlock()
-			}
-		}
-		s.lockLocal.RUnlock()
-		s.lockLocal.Lock()
-		s.localAddrs = make(map[uint32]net.Addr)
-		for key, value := range addrs {
-			s.localAddrs[key] = value
-		}
-		s.lockLocal.Unlock()
-	}
-}
-
-func (s *SchedulerRoundRobin) queueHandler() {
-	for {
-		if s.isActive && s.session != nil {
-			s.processAdditionQueue()
-			s.processDeletionQueue()
-		}
-	}
-}
-
-func (s *SchedulerRoundRobin) processAdditionQueue() {
-	s.lockAQ.Lock()
-	defer s.lockAQ.Unlock()
-	if len(s.additionQueue) > 0 {
-		addr := s.additionQueue[0]
-		s.addLocalAddress(addr)
-		s.session.(*session).queueControlFrame(s.assembleAddrModFrame(wire.AddFrame, addr))
-		s.session.(*session).logger.Debugf("Queued addition frame for address %s", addr.String())
-		s.additionQueue[0] = nil
-		s.additionQueue = s.additionQueue[1:]
-	}
-}
-
-func (s *SchedulerRoundRobin) processDeletionQueue() {
-	s.lockDQ.Lock()
-	defer s.lockDQ.Unlock()
-	if len(s.deletionQueue) > 0 {
-		addr := s.deletionQueue[0]
-		s.session.(*session).queueControlFrame(s.assembleAddrModFrame(wire.DeleteFrame, addr))
-		s.session.(*session).logger.Debugf("Queued deletion frame for address %s", addr.String())
-		for pathID, path := range s.paths {
-			if path.contains(addr) {
-				s.removePath(pathID)
-			}
-		}
-		s.deletionQueue[0] = nil
-		s.deletionQueue = s.deletionQueue[1:]
 	}
 }
 
