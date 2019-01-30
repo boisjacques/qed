@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"github.com/boisjacques/golang-utils"
 	"github.com/boisjacques/qed/internal/wire"
-	"github.com/sasha-s/go-deadlock"
 	"github.com/tylerwince/godbg"
 	"hash/crc32"
 	"net"
@@ -23,9 +22,6 @@ type SchedulerRoundRobin struct {
 	localAddrs      map[uint32]net.Addr
 	remoteAddrs     map[uint32]net.Addr
 	sockets         map[uint32]net.PacketConn
-	lockRemote      deadlock.RWMutex
-	lockLocal       deadlock.RWMutex
-	lockPaths       deadlock.RWMutex
 	isInitialized   bool
 	totalPathWeight int
 	isActive        bool
@@ -56,9 +52,6 @@ func NewSchedulerRoundRobin(session Session, pconn net.PacketConn, remote net.Ad
 		localAddrs:      make(map[uint32]net.Addr),
 		remoteAddrs:     make(map[uint32]net.Addr),
 		sockets:         make(map[uint32]net.PacketConn),
-		lockRemote:      deadlock.RWMutex{},
-		lockLocal:       deadlock.RWMutex{},
-		lockPaths:       deadlock.RWMutex{},
 		isInitialized:   false,
 		totalPathWeight: 1000,
 		isActive:        false,
@@ -89,8 +82,6 @@ func (s *SchedulerRoundRobin) Activate(isActive bool) {
 }
 
 func (s *SchedulerRoundRobin) Write(p []byte) error {
-	s.lockPaths.RLock()
-	defer s.lockPaths.RUnlock()
 	path := s.roundRobin()
 
 	_, err := path.local.WriteTo(p, path.remote)
@@ -144,8 +135,6 @@ func (s *SchedulerRoundRobin) addRemoteAddress(addr net.Addr) {
 	checksum := CRC(addr)
 	if !s.containsBlocking(checksum, remote) {
 		s.remoteAddrs[checksum] = addr
-		s.lockLocal.RLock()
-		defer s.lockLocal.RUnlock()
 		for _, laddr := range s.localAddrs {
 			if isSameVersion(laddr, addr) {
 				s.newPath(laddr, addr)
@@ -208,13 +197,9 @@ func (s *SchedulerRoundRobin) assembleOwdFrame(pathId uint32) *wire.OwdFrame {
 func (s *SchedulerRoundRobin) containsBlocking(key uint32, direcion direcionAddr) bool {
 	var contains bool
 	if direcion == local {
-		s.lockLocal.Lock()
 		_, contains = s.localAddrs[key]
-		s.lockLocal.Unlock()
 	} else if direcion == remote {
-		s.lockRemote.Lock()
 		_, contains = s.remoteAddrs[key]
-		s.lockRemote.Unlock()
 	}
 	return contains
 }
@@ -226,20 +211,14 @@ func (s *SchedulerRoundRobin) delete(addr net.Addr, direction direcionAddr) {
 		}
 	}
 	if direction == local {
-		s.lockLocal.Lock()
 		delete(s.localAddrs, CRC(addr))
-		s.lockLocal.Unlock()
 	}
 	if direction == remote {
-		s.lockRemote.Lock()
 		delete(s.remoteAddrs, CRC(addr))
-		s.lockRemote.Unlock()
 	}
 }
 
 func (s *SchedulerRoundRobin) deletePath(pathId uint32) {
-	s.lockPaths.Lock()
-	defer s.lockPaths.Unlock()
 	delete(s.paths, pathId)
 }
 
