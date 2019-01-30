@@ -177,8 +177,9 @@ func (s *SchedulerRoundRobin) removePath(pathId uint32) {
 }
 
 func (s *SchedulerRoundRobin) announceAddresses() {
+	for s.session == nil {
+	}
 	for !s.session.(*session).handshakeComplete {
-
 	}
 	for _, addr := range s.localAddrs {
 		if addr != s.pathZero.local.LocalAddr() {
