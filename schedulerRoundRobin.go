@@ -166,9 +166,19 @@ func (s *SchedulerRoundRobin) removePath(pathId uint32) {
 }
 
 func (s *SchedulerRoundRobin) announceAddresses() {
+	sessCtr := 0
+	actCtr := 0
 	for s.session == nil {
+		sessCtr++
+		if sessCtr%1000 == 0 {
+			godbg.Dbg("Nilsession")
+		}
 	}
 	for !s.isActive {
+		actCtr++
+		if actCtr%1000==0{
+			godbg.Dbg("Scheduler inactive")
+		}
 	}
 	for _, addr := range s.localAddrs {
 		if addr != s.pathZero.local.LocalAddr() {
