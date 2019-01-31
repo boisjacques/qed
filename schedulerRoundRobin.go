@@ -110,17 +110,18 @@ func (s *SchedulerRoundRobin) roundRobin() *Path {
 }
 
 // TODO: Implement proper source address handling
-func (s *SchedulerRoundRobin) newPath(local, remote net.Addr) {
+func (s *SchedulerRoundRobin) newPath(local, remote net.Addr) error{
 	usock, err := s.openSocket(local)
 	if err != nil {
-		s.session.(*session).logger.Errorf("Path could not be created because of %s", err)
-		return
+		s.session.(*session).logger.Errorf("Path could not be created: %s", err)
+		return err
 	}
 	checksum := crc32.ChecksumIEEE(xor([]byte(local.String()), []byte(remote.String())))
 
 	p := NewPath(checksum, usock, remote, 1000)
 	s.paths[p.pathID] = p
 	s.pathIds = append(s.pathIds, p.pathID)
+	return nil
 }
 
 func (s *SchedulerRoundRobin) addLocalAddress(local net.Addr) {
