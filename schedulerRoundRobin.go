@@ -114,7 +114,6 @@ func (s *SchedulerRoundRobin) newPath(local, remote net.Addr) {
 	usock, err := s.openSocket(local)
 	if err != nil {
 		s.session.(*session).logger.Errorf("Path could not be created because of %s", err)
-		return
 	}
 	checksum := crc32.ChecksumIEEE(xor([]byte(local.String()), []byte(remote.String())))
 
