@@ -114,6 +114,7 @@ func (s *SchedulerRoundRobin) newPath(local, remote net.Addr) {
 	usock, err := s.openSocket(local)
 	if err != nil {
 		s.session.(*session).logger.Errorf("Path could not be created because of %s", err)
+		return
 	}
 	checksum := crc32.ChecksumIEEE(xor([]byte(local.String()), []byte(remote.String())))
 
@@ -175,7 +176,7 @@ func (s *SchedulerRoundRobin) announceAddresses() {
 	}
 	for !s.isActive {
 		actCtr++
-		if actCtr%1000==0{
+		if actCtr%1000 == 0 {
 			godbg.Dbg("Scheduler inactive")
 		}
 	}
@@ -240,7 +241,9 @@ func (s *SchedulerRoundRobin) openSocket(local net.Addr) (net.PacketConn, error)
 	usock, contains := s.sockets[CRC(local)]
 	if !contains {
 		usock, err = net.ListenUDP("udp", local.(*net.UDPAddr))
-		s.sockets[CRC(local)] = usock
+		if usock != nil {
+			s.sockets[CRC(local)] = usock
+		}
 	}
 	return usock, err
 }
