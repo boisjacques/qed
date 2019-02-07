@@ -137,13 +137,13 @@ func (s *SchedulerRoundRobin) addLocalAddress(local net.Addr) {
 	}
 }
 
-func (s *SchedulerRoundRobin) addRemoteAddress(addr net.Addr) {
-	checksum := CRC(addr)
+func (s *SchedulerRoundRobin) addRemoteAddress(remoteAddress net.Addr) {
+	checksum := CRC(remoteAddress)
 	if !s.containsBlocking(checksum, remote) {
-		s.remoteAddrs[checksum] = addr
-		for _, laddr := range s.localAddrs {
-			if isSameVersion(laddr, addr) {
-				err := s.newPath(laddr, addr)
+		s.remoteAddrs[checksum] = remoteAddress
+		for _, localAddress := range s.localAddrs {
+			if isSameVersion(localAddress, remoteAddress) {
+				err := s.newPath(localAddress, remoteAddress)
 				if err != nil {
 					s.session.(*session).logger.Errorf("Path could not be created: %s", err)
 				}
