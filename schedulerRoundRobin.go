@@ -85,7 +85,7 @@ func (s *SchedulerRoundRobin) Write(p []byte) error {
 	var path *Path
 	for {
 		path = s.roundRobin()
-		if path.local != nil {
+		if path.local != nil && path != nil {
 			break
 		}
 		s.session.(*session).logger.Errorf("nil path selected")
@@ -95,9 +95,6 @@ func (s *SchedulerRoundRobin) Write(p []byte) error {
 	if err != nil {
 		fmt.Println(err, util.Tracer())
 		return err
-	}
-	if path.pathID == 0 {
-	} else {
 	}
 	return nil
 }
@@ -116,7 +113,6 @@ func (s *SchedulerRoundRobin) roundRobin() *Path {
 	return s.paths[s.pathIds[s.lastPath]]
 }
 
-// TODO: Implement proper source address handling
 func (s *SchedulerRoundRobin) newPath(local, remote net.Addr) error {
 	usock, err := s.openSocket(local)
 	if err != nil {
