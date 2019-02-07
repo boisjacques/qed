@@ -1,9 +1,12 @@
 package main
 
 import (
+	"bufio"
 	"flag"
+	"fmt"
 	"github.com/tylerwince/godbg"
 	"net"
+	"os"
 )
 
 var addr string
@@ -15,7 +18,7 @@ func main(){
 		godbg.Dbg("No address provided. Exiting.")
 		return
 	}
-	genericSock,err := net.ListenUDP("udp", &net.UDPAddr{IP: net.IPv4zero, Port: 0})
+	genericSock,err := net.ListenUDP("udp", &net.UDPAddr{IP: net.IPv4zero, Port: 4711})
 	if err != nil {
 		godbg.Dbg(err)
 	}
@@ -29,6 +32,12 @@ func main(){
 	if err != nil {
 		godbg.Dbg(err)
 	}
+
+
+	reader := bufio.NewReader(os.Stdin)
+	fmt.Print("Press any key to exit…")
+	reader.ReadString('\n')
+
 	genericSock.Close()
 	usock.Close()
 }
