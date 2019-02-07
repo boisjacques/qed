@@ -6,6 +6,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/pem"
+	"flag"
 	"fmt"
 	"github.com/boisjacques/qed"
 	"io"
@@ -13,10 +14,16 @@ import (
 	"math/big"
 )
 
-const addr = "0.0.0.0:4433"
+var addr string
 
 // Adapted example echo client/server from quic-go
 func main() {
+	flag.StringVar(&addr, "addr", "", "address:port")
+	flag.Parse()
+	if addr == "" {
+		log.Fatal("No address provided. Exiting.")
+		return
+	}
 	log.Fatal(echoServer())
 }
 
