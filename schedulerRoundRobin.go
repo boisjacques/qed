@@ -191,13 +191,13 @@ func (s *SchedulerRoundRobin) announceAddresses() {
 	actCtr := 0
 	for s.session == nil {
 		sessCtr++
-		if sessCtr%1000 == 0 {
+		if sessCtr%100000 == 0 {
 			godbg.Dbg("Nilsession")
 		}
 	}
 	for !s.isActive {
 		actCtr++
-		if actCtr%1000 == 0 {
+		if actCtr%100000 == 0 {
 			godbg.Dbg("Scheduler inactive")
 		}
 	}
