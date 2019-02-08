@@ -84,10 +84,10 @@ func (s *SchedulerRoundRobin) Activate(isActive bool) {
 }
 
 func (s *SchedulerRoundRobin) Write(p []byte) error {
-	var path *Path
+	var path Path
 	for {
 		path = s.roundRobin()
-		if path != nil && path.local != nil {
+		if path.local != nil {
 			break
 		}
 		s.session.(*session).logger.Errorf("nil path selected")
@@ -171,7 +171,7 @@ func (s *SchedulerRoundRobin) removeAddress(address net.Addr) {
 	}
 }
 
-func (s *SchedulerRoundRobin) GetPathZero() *Path {
+func (s *SchedulerRoundRobin) GetPathZero() Path {
 	return s.pathZero
 }
 
