@@ -112,7 +112,11 @@ func (s *SchedulerRoundRobin) SetCurrentRemoteAddr(net.Addr) {}
 
 func (s *SchedulerRoundRobin) roundRobin() *Path {
 	s.lastPath = (s.lastPath + 1) % uint32(len(s.pathIds))
-	return s.paths[s.pathIds[s.lastPath]]
+	path := s.paths[s.pathIds[s.lastPath]]
+	godbg.Dbg("****************")
+	godbg.Dbg(path.local)
+	godbg.Dbg("****************")
+	return path
 }
 
 func (s *SchedulerRoundRobin) newPath(local, remote net.Addr) error {
@@ -120,6 +124,9 @@ func (s *SchedulerRoundRobin) newPath(local, remote net.Addr) error {
 	if err != nil {
 		return err
 	}
+	godbg.Dbg("****************")
+	godbg.Dbg(usock)
+	godbg.Dbg("****************")
 	if usock == nil {
 		return errors.New("no socket returned")
 	}
