@@ -86,6 +86,7 @@ func (s *SchedulerRoundRobin) Write(p []byte) error {
 	for {
 		path = s.roundRobin()
 		if path != nil && path.local != nil && path.remote != nil{
+			godbg.Dbg(path.local)
 			break
 		}
 		s.session.(*session).logger.Errorf("nil path selected")
