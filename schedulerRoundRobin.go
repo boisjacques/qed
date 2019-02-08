@@ -123,7 +123,10 @@ func (s *SchedulerRoundRobin) roundRobin() *Path {
 func (s *SchedulerRoundRobin) newPath(local, remote net.Addr) error {
 	usock, err := s.openSocket(local)
 	if err != nil {
+		godbg.Dbg(err)
 		return err
+	} else {
+		godbg.Dbg(err)
 	}
 	godbg.Dbg("****************")
 	godbg.Dbg(usock)
