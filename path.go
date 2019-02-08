@@ -15,8 +15,8 @@ type Path struct {
 	remote     net.Addr
 }
 
-func NewPath(pathId uint32, pconn net.PacketConn, remote net.Addr, weight int) *Path {
-	return &Path{
+func NewPath(pathId uint32, pconn net.PacketConn, remote net.Addr, weight int) Path {
+	return Path{
 		isPathZero: false,
 		pathID:     pathId,
 		weight:     weight,

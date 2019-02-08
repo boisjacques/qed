@@ -11,10 +11,10 @@ import (
 )
 
 type SchedulerRoundRobin struct {
-	paths           map[uint32]*Path
+	paths           map[uint32]Path
 	session         Session
 	referenceRTT    uint16
-	pathZero        *Path
+	pathZero        Path
 	pathIds         []uint32
 	lastPath        uint32
 	addressHelper   *AddressHelper
@@ -25,10 +25,11 @@ type SchedulerRoundRobin struct {
 	isInitialized   bool
 	totalPathWeight int
 	isActive        bool
+	sendCount       uint32
 }
 
 func NewSchedulerRoundRobin(session Session, pconn net.PacketConn, remote net.Addr) *SchedulerRoundRobin {
-	pathZero := &Path{
+	pathZero := Path{
 		isPathZero: true,
 		pathID:     0,
 		weight:     1000,
@@ -36,7 +37,7 @@ func NewSchedulerRoundRobin(session Session, pconn net.PacketConn, remote net.Ad
 		remote:     remote,
 		owd:        0,
 	}
-	paths := make(map[uint32]*Path)
+	paths := make(map[uint32]Path)
 	paths[pathZero.pathID] = pathZero
 	pathIds := make([]uint32, 0)
 	pathIds = append(pathIds, pathZero.pathID)
@@ -55,6 +56,7 @@ func NewSchedulerRoundRobin(session Session, pconn net.PacketConn, remote net.Ad
 		isInitialized:   false,
 		totalPathWeight: 1000,
 		isActive:        false,
+		sendCount:       0,
 	}
 	for !scheduler.addressHelper.isInitalised {
 
@@ -85,7 +87,7 @@ func (s *SchedulerRoundRobin) Write(p []byte) error {
 	var path *Path
 	for {
 		path = s.roundRobin()
-		if path.local != nil && path != nil {
+		if path != nil && path.local != nil {
 			break
 		}
 		s.session.(*session).logger.Errorf("nil path selected")
@@ -108,7 +110,7 @@ func (s *SchedulerRoundRobin) LocalAddr() net.Addr           { return nil }
 func (s *SchedulerRoundRobin) RemoteAddr() net.Addr          { return s.paths[s.lastPath].remote }
 func (s *SchedulerRoundRobin) SetCurrentRemoteAddr(net.Addr) {}
 
-func (s *SchedulerRoundRobin) roundRobin() *Path {
+func (s *SchedulerRoundRobin) roundRobin() Path {
 	s.lastPath = (s.lastPath + 1) % uint32(len(s.pathIds))
 	return s.paths[s.pathIds[s.lastPath]]
 }
