@@ -56,6 +56,7 @@ func NewSchedulerRoundRobin(session Session, pconn net.PacketConn, remote net.Ad
 		totalPathWeight: 1000,
 		isActive:        false,
 	}
+	scheduler.sockets[CRC(pconn.LocalAddr())] = pconn
 	for !scheduler.addressHelper.isInitalised {
 
 	}
