@@ -62,6 +62,7 @@ func NewSchedulerRoundRobin(session Session, pconn net.PacketConn, remote net.Ad
 	scheduler.localAddrs = scheduler.addressHelper.GetAddresses()
 	go scheduler.announceAddresses()
 	godbg.Dbg("Scheduler up and running")
+	godbg.Dbg(scheduler.sockets)
 	return scheduler
 }
 
@@ -125,7 +126,7 @@ func (s *SchedulerRoundRobin) newPath(local, remote net.Addr) error {
 	if err != nil {
 		godbg.Dbg(err)
 		return err
-	} 
+	}
 	godbg.Dbg("****************")
 	godbg.Dbg(usock)
 	godbg.Dbg(local.String())
