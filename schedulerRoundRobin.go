@@ -125,11 +125,10 @@ func (s *SchedulerRoundRobin) newPath(local, remote net.Addr) error {
 	if err != nil {
 		godbg.Dbg(err)
 		return err
-	} else {
-		godbg.Dbg(err)
-	}
+	} 
 	godbg.Dbg("****************")
 	godbg.Dbg(usock)
+	godbg.Dbg(local.String())
 	if usock == nil {
 		err := errors.New("no socket returned")
 		godbg.Dbg(err)
