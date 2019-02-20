@@ -302,7 +302,7 @@ func (s *SchedulerImplementation) openSocket(local net.Addr) (net.PacketConn, er
 func (s *SchedulerImplementation) measurePathsRunner() {
 	go func() {
 		for {
-			if s.isActive {
+			if s.isActive && s.mode == weightBased{
 				s.measurePaths()
 			}
 			time.Sleep(100 * time.Millisecond)
@@ -314,6 +314,7 @@ func (s *SchedulerImplementation) measurePathsRunner() {
 func (s *SchedulerImplementation) measurePaths() {
 	for _, path := range s.paths {
 		s.measurePath(path)
+		godbg.Dbg("measuring: " + path.Write())
 	}
 }
 
@@ -332,7 +333,7 @@ func (s *SchedulerImplementation) sumUpWeights() {
 func (s *SchedulerImplementation) weighPathsRunner() {
 	go func() {
 		for {
-			if s.isActive {
+			if s.isActive && s.mode == weightBased{
 				s.weighPaths()
 			}
 			time.Sleep(100 * time.Millisecond)
