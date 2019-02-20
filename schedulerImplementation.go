@@ -87,20 +87,21 @@ func (s *SchedulerImplementation) Activate(isActive bool) {
 
 func (s *SchedulerImplementation) Write(p []byte) error {
 	var path *Path
+	var err error
 	for {
-		path, err := s.getPath()
+		path, err = s.getPath()
 		if err != nil {
 
 		}
-		godbg.Dbg(path.local)
-		if path.local != nil {
-			godbg.Dbg(path.local)
+		godbg.Dbg(path.Write())
+		if path != nil && path.local != nil {
+			godbg.Dbg(path.Write())
 			break
 		}
 		s.session.(*session).logger.Errorf("nil path selected")
 	}
-
-	_, err := path.local.WriteTo(p, path.remote)
+	godbg.Dbg(path.Write())
+	_, err = path.local.WriteTo(p, path.remote)
 	if err != nil {
 		fmt.Println(err, util.Tracer())
 		return err
@@ -128,7 +129,7 @@ func (s *SchedulerImplementation) getPath() (*Path, error) {
 }
 
 func (s *SchedulerImplementation) getWeightedPath() (*Path, error) {
-	return nil, errors.New("Not ")
+	return nil, errors.New("not implemented yet")
 }
 
 func (s *SchedulerImplementation) getRoundRobinPath() (*Path, error) {

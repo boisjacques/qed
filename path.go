@@ -1,6 +1,7 @@
 package quic
 
 import (
+	"fmt"
 	"net"
 )
 
@@ -40,4 +41,8 @@ func (p *Path) setOwd(owd int64) {
 
 func (p *Path) contains(address net.Addr) bool {
 	return (p.local.LocalAddr() == address || p.remote == address)
+}
+
+func (p *Path) Write() string {
+	return fmt.Sprintf("%d\n%s\n%s", p.pathID, p.local.LocalAddr().String(), p.remote.String())
 }
