@@ -7,7 +7,9 @@ import (
 	"github.com/boisjacques/qed/internal/wire"
 	"github.com/tylerwince/godbg"
 	"hash/crc32"
+	"math/rand"
 	"net"
+	"time"
 )
 
 type SchedulerImplementation struct {
@@ -129,7 +131,15 @@ func (s *SchedulerImplementation) getPath() (*Path, error) {
 }
 
 func (s *SchedulerImplementation) getWeightedPath() (*Path, error) {
-	return nil, errors.New("not implemented yet")
+	rand.Seed(time.Now().UnixNano())
+	r := rand.Intn(s.totalPathWeight)
+	for _, path := range s.paths {
+		r -= path.weight
+		if r <= 0 {
+			return path, nil
+		}
+	}
+	return nil, errors.New("no path selected")
 }
 
 func (s *SchedulerImplementation) getRoundRobinPath() (*Path, error) {
@@ -287,4 +297,75 @@ func (s *SchedulerImplementation) openSocket(local net.Addr) (net.PacketConn, er
 		}
 	}
 	return usock, err
+}
+
+func (s *SchedulerImplementation) measurePathsRunner() {
+	go func() {
+		for {
+			if s.isActive {
+				s.measurePaths()
+			}
+			time.Sleep(100 * time.Millisecond)
+		}
+	}()
+}
+
+// If deadlock look here
+func (s *SchedulerImplementation) measurePaths() {
+	for _, path := range s.paths {
+		s.measurePath(path)
+	}
+}
+
+//TODO: Time has to move further down the path
+func (s *SchedulerImplementation) measurePath(path *Path) {
+	s.session.(*session).queueControlFrame(s.assembleOwdFrame(path.pathID))
+}
+
+func (s *SchedulerImplementation) sumUpWeights() {
+	s.totalPathWeight = 0
+	for _, path := range s.paths {
+		s.totalPathWeight += path.weight
+	}
+}
+
+func (s *SchedulerImplementation) weighPathsRunner() {
+	go func() {
+		for {
+			if s.isActive {
+				s.weighPaths()
+			}
+			time.Sleep(100 * time.Millisecond)
+		}
+	}()
+}
+
+func (s *SchedulerImplementation) weighPaths() {
+	for _, path := range s.paths {
+		s.weighPath(path)
+	}
+	s.sumUpWeights()
+}
+
+func (s *SchedulerImplementation) weighPath(path *Path) {
+
+	if path.owd < s.calculateAverageOwd() {
+		if path.weight < 1000 {
+			path.weight = path.weight + 1
+		}
+	} else {
+		if path.weight > 1 {
+			path.weight = path.weight - 1
+		}
+	}
+}
+
+// TODO: Put moving avg. here
+func (s *SchedulerImplementation) calculateAverageOwd() uint64 {
+	var aOwd uint64
+	for _, path := range s.paths {
+		aOwd += path.owd
+	}
+	aOwd = aOwd / uint64(len(s.paths))
+	return aOwd
 }
