@@ -11,3 +11,7 @@ out\.file
 key\.pem
 
 example/addressHelperTest/ahTest\.go
+
+example/bin/echo/client/rundebug\.sh
+
+example/bin/echo/server/rundebug\.sh
