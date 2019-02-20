@@ -472,7 +472,7 @@ func (s *session) handleHandshakeComplete() {
 		s.queueControlFrame(&wire.PingFrame{})
 		s.sentPacketHandler.SetHandshakeComplete()
 	}
-	s.conn.(*SchedulerRoundRobin).Activate(true)
+	s.conn.(*SchedulerImplementation).Activate(true)
 }
 
 func (s *session) handlePacketImpl(p *receivedPacket) error {
@@ -700,13 +700,13 @@ func (s *session) handleAckFrame(frame *wire.AckFrame, encLevel protocol.Encrypt
 
 func (s *session) handleAddressModificationFrame(frame *wire.AddrModFrame) error {
 	if frame.Operation() == 0x0 {
-		s.conn.(*SchedulerRoundRobin).removeAddress(frame.Address())
+		s.conn.(*SchedulerImplementation).removeAddress(frame.Address())
 	} else {
 		remote, err := net.ResolveUDPAddr("udp", frame.Address().String())
 		if err != nil {
 			return err
 		}
-		s.conn.(*SchedulerRoundRobin).addRemoteAddress(remote)
+		s.conn.(*SchedulerImplementation).addRemoteAddress(remote)
 	}
 	return nil
 }
@@ -719,7 +719,7 @@ func (s *session) handleOneWayDelayFrame(frame *wire.OwdFrame) error {
 }
 
 func (s *session) handleOneWayDelayAckFrame(frame *wire.OwdAckFrame) error {
-	err := s.conn.(*SchedulerRoundRobin).setOwd(frame.PathID(), frame.Owd())
+	err := s.conn.(*SchedulerImplementation).setOwd(frame.PathID(), frame.Owd())
 	if err != nil {
 		return err
 	}

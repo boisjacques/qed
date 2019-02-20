@@ -9,6 +9,13 @@ const (
 	remote = direcionAddr(1)
 )
 
+type schedulerOperation uint8
+
+const (
+	roundRobin = schedulerOperation(0)
+	weightBased = schedulerOperation(1)
+)
+
 type Scheduler interface {
 	Write([]byte) error
 	Read([]byte) (int, net.Addr, error)

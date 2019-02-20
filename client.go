@@ -135,7 +135,7 @@ func dialContext(
 	if err := c.dial(ctx); err != nil {
 		return nil, err
 	}
-	c.conn.(*SchedulerRoundRobin).session = c.session
+	c.conn.(*SchedulerImplementation).session = c.session
 	return c.session, nil
 }
 
@@ -172,7 +172,7 @@ func newClient(
 		onClose = closeCallback
 	}
 	c := &client{
-		conn:              NewSchedulerRoundRobin(nil, pconn, remoteAddr),
+		conn:              NewScheduler(nil, pconn, remoteAddr),
 		createdPacketConn: createdPacketConn,
 		tlsConf:           tlsConf,
 		config:            config,

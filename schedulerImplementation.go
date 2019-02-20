@@ -10,7 +10,7 @@ import (
 	"net"
 )
 
-type SchedulerRoundRobin struct {
+type SchedulerImplementation struct {
 	paths           map[uint32]*Path
 	session         Session
 	referenceRTT    uint16
@@ -25,9 +25,10 @@ type SchedulerRoundRobin struct {
 	isInitialized   bool
 	totalPathWeight int
 	isActive        bool
+	mode            schedulerOperation
 }
 
-func NewSchedulerRoundRobin(session Session, pconn net.PacketConn, remote net.Addr) *SchedulerRoundRobin {
+func NewScheduler(session Session, pconn net.PacketConn, remote net.Addr) *SchedulerImplementation {
 	pathZero := &Path{
 		isPathZero: true,
 		pathID:     0,
@@ -40,7 +41,7 @@ func NewSchedulerRoundRobin(session Session, pconn net.PacketConn, remote net.Ad
 	paths[pathZero.pathID] = pathZero
 	pathIds := make([]uint32, 0)
 	pathIds = append(pathIds, pathZero.pathID)
-	scheduler := &SchedulerRoundRobin{
+	scheduler := &SchedulerImplementation{
 		paths:           paths,
 		session:         session,
 		referenceRTT:    0,
@@ -55,6 +56,7 @@ func NewSchedulerRoundRobin(session Session, pconn net.PacketConn, remote net.Ad
 		isInitialized:   false,
 		totalPathWeight: 1000,
 		isActive:        false,
+		mode:            roundRobin,
 	}
 	scheduler.sockets[CRC(pconn.LocalAddr())] = pconn
 	for !scheduler.addressHelper.isInitalised {
@@ -67,26 +69,29 @@ func NewSchedulerRoundRobin(session Session, pconn net.PacketConn, remote net.Ad
 	return scheduler
 }
 
-func (s *SchedulerRoundRobin) IsInitialized() bool {
+func (s *SchedulerImplementation) IsInitialized() bool {
 	return s.isInitialized
 }
 
-func (s *SchedulerRoundRobin) SetIsInitialized(isInitialized bool) {
+func (s *SchedulerImplementation) SetIsInitialized(isInitialized bool) {
 	s.isInitialized = isInitialized
 }
 
-func (s *SchedulerRoundRobin) IsActive() bool {
+func (s *SchedulerImplementation) IsActive() bool {
 	return s.isActive
 }
 
-func (s *SchedulerRoundRobin) Activate(isActive bool) {
+func (s *SchedulerImplementation) Activate(isActive bool) {
 	s.isActive = isActive
 }
 
-func (s *SchedulerRoundRobin) Write(p []byte) error {
+func (s *SchedulerImplementation) Write(p []byte) error {
 	var path *Path
 	for {
-		path = s.roundRobin()
+		path, err := s.getPath()
+		if err != nil {
+
+		}
 		godbg.Dbg(path.local)
 		if path.local != nil {
 			godbg.Dbg(path.local)
@@ -103,22 +108,36 @@ func (s *SchedulerRoundRobin) Write(p []byte) error {
 	return nil
 }
 
-func (s *SchedulerRoundRobin) Read([]byte) (int, net.Addr, error) { return 0, nil, errors.New("Not implemented yet") }
-func (s *SchedulerRoundRobin) Close() error {
+func (s *SchedulerImplementation) Read([]byte) (int, net.Addr, error) { return 0, nil, errors.New("Not implemented yet") }
+func (s *SchedulerImplementation) Close() error {
 	// TODO: Mock close
-	return errors.New("Not implemented yet")
+	return errors.New("not implemented yet")
 }
-func (s *SchedulerRoundRobin) LocalAddr() net.Addr           { return nil }
-func (s *SchedulerRoundRobin) RemoteAddr() net.Addr          { return s.paths[s.lastPath].remote }
-func (s *SchedulerRoundRobin) SetCurrentRemoteAddr(net.Addr) {}
+func (s *SchedulerImplementation) LocalAddr() net.Addr           { return nil }
+func (s *SchedulerImplementation) RemoteAddr() net.Addr          { return s.paths[s.lastPath].remote }
+func (s *SchedulerImplementation) SetCurrentRemoteAddr(net.Addr) {}
 
-func (s *SchedulerRoundRobin) roundRobin() *Path {
+func (s *SchedulerImplementation) getPath() (*Path, error) {
+	if s.mode == roundRobin {
+		return s.getRoundRobinPath()
+	} else if s.mode == weightBased {
+		return s.getWeightedPath()
+	} else {
+		return nil, errors.New("invalid mode of scheduler operation")
+	}
+}
+
+func (s *SchedulerImplementation) getWeightedPath() (*Path, error) {
+	return nil, errors.New("Not ")
+}
+
+func (s *SchedulerImplementation) getRoundRobinPath() (*Path, error) {
 	s.lastPath = (s.lastPath + 1) % uint32(len(s.pathIds))
 	path := s.paths[s.pathIds[s.lastPath]]
-	return path
+	return path, nil
 }
 
-func (s *SchedulerRoundRobin) newPath(local, remote net.Addr) error {
+func (s *SchedulerImplementation) newPath(local, remote net.Addr) error {
 	usock, err := s.openSocket(local)
 	if err != nil {
 		godbg.Dbg(err)
@@ -137,7 +156,7 @@ func (s *SchedulerRoundRobin) newPath(local, remote net.Addr) error {
 	return nil
 }
 
-func (s *SchedulerRoundRobin) addLocalAddress(local net.Addr) {
+func (s *SchedulerImplementation) addLocalAddress(local net.Addr) {
 	for _, remote := range s.remoteAddrs {
 		if isSameVersion(local, remote) {
 			err := s.newPath(local, remote)
@@ -148,7 +167,7 @@ func (s *SchedulerRoundRobin) addLocalAddress(local net.Addr) {
 	}
 }
 
-func (s *SchedulerRoundRobin) addRemoteAddress(remoteAddress net.Addr) {
+func (s *SchedulerImplementation) addRemoteAddress(remoteAddress net.Addr) {
 	checksum := CRC(remoteAddress)
 	if !s.containsBlocking(checksum, remote) {
 		s.remoteAddrs[checksum] = remoteAddress
@@ -163,7 +182,7 @@ func (s *SchedulerRoundRobin) addRemoteAddress(remoteAddress net.Addr) {
 	}
 }
 
-func (s *SchedulerRoundRobin) removeAddress(address net.Addr) {
+func (s *SchedulerImplementation) removeAddress(address net.Addr) {
 	if s.containsBlocking(CRC(address), remote) {
 		s.delete(address, remote)
 	}
@@ -177,15 +196,15 @@ func (s *SchedulerRoundRobin) removeAddress(address net.Addr) {
 	}
 }
 
-func (s *SchedulerRoundRobin) GetPathZero() *Path {
+func (s *SchedulerImplementation) GetPathZero() *Path {
 	return s.pathZero
 }
 
-func (s *SchedulerRoundRobin) removePath(pathId uint32) {
+func (s *SchedulerImplementation) removePath(pathId uint32) {
 	delete(s.paths, pathId)
 }
 
-func (s *SchedulerRoundRobin) announceAddresses() {
+func (s *SchedulerImplementation) announceAddresses() {
 	sessCtr := 0
 	actCtr := 0
 	for s.session == nil {
@@ -208,7 +227,7 @@ func (s *SchedulerRoundRobin) announceAddresses() {
 	}
 }
 
-func (s *SchedulerRoundRobin) assembleAddrModFrame(operation wire.AddressModificationOperation, addr net.Addr) *wire.AddrModFrame {
+func (s *SchedulerImplementation) assembleAddrModFrame(operation wire.AddressModificationOperation, addr net.Addr) *wire.AddrModFrame {
 	var version wire.IpVersion
 	if addr.(*net.UDPAddr).IP.To4() != nil {
 		version = wire.IPv4
@@ -219,12 +238,12 @@ func (s *SchedulerRoundRobin) assembleAddrModFrame(operation wire.AddressModific
 	return f
 }
 
-func (s *SchedulerRoundRobin) assembleOwdFrame(pathId uint32) *wire.OwdFrame {
+func (s *SchedulerImplementation) assembleOwdFrame(pathId uint32) *wire.OwdFrame {
 	f := wire.NewOwdFrame(pathId)
 	return f
 }
 
-func (s *SchedulerRoundRobin) containsBlocking(key uint32, direcion direcionAddr) bool {
+func (s *SchedulerImplementation) containsBlocking(key uint32, direcion direcionAddr) bool {
 	var contains bool
 	if direcion == local {
 		_, contains = s.localAddrs[key]
@@ -234,7 +253,7 @@ func (s *SchedulerRoundRobin) containsBlocking(key uint32, direcion direcionAddr
 	return contains
 }
 
-func (s *SchedulerRoundRobin) delete(addr net.Addr, direction direcionAddr) {
+func (s *SchedulerImplementation) delete(addr net.Addr, direction direcionAddr) {
 	for key, path := range s.paths {
 		if path.contains(addr) {
 			s.deletePath(key)
@@ -248,15 +267,16 @@ func (s *SchedulerRoundRobin) delete(addr net.Addr, direction direcionAddr) {
 	}
 }
 
-func (s *SchedulerRoundRobin) deletePath(pathId uint32) {
+func (s *SchedulerImplementation) deletePath(pathId uint32) {
 	delete(s.paths, pathId)
 }
 
-func (s *SchedulerRoundRobin) setOwd(id uint32, owd int64) error {
-	return errors.New("cannot set OWD in non OWD scheduler")
+func (s *SchedulerImplementation) setOwd(pathId uint32, owd int64) error {
+	s.paths[pathId].setOwd(owd)
+	return nil
 }
 
-func (s *SchedulerRoundRobin) openSocket(local net.Addr) (net.PacketConn, error) {
+func (s *SchedulerImplementation) openSocket(local net.Addr) (net.PacketConn, error) {
 	var err error = nil
 	usock, contains := s.sockets[CRC(local)]
 	if !contains {

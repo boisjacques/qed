@@ -409,7 +409,7 @@ func (s *server) createNewSession(
 		StatelessResetToken:  bytes.Repeat([]byte{42}, 16),
 		OriginalConnectionID: origDestConnID,
 	}
-	sched := NewSchedulerRoundRobin(nil, s.conn, remoteAddr)
+	sched := NewScheduler(nil, s.conn, remoteAddr)
 	sess, err := s.newSession(
 		sched,
 		s.sessionRunner,
