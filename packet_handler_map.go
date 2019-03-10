@@ -19,7 +19,7 @@ import (
 type packetHandlerMap struct {
 	mutex sync.RWMutex
 
-	conn      net.PacketConn
+	conns      map[net.PacketConn]bool
 	connIDLen int
 
 	handlers map[string] /* string(ConnectionID)*/ packetHandler
@@ -35,12 +35,13 @@ var _ packetHandlerManager = &packetHandlerMap{}
 
 func newPacketHandlerMap(conn net.PacketConn, connIDLen int, logger utils.Logger) packetHandlerManager {
 	m := &packetHandlerMap{
-		conn:                      conn,
+		conns:                     make(map[net.PacketConn]bool),
 		connIDLen:                 connIDLen,
 		handlers:                  make(map[string]packetHandler),
 		deleteClosedSessionsAfter: protocol.ClosedSessionDeleteTimeout,
 		logger:                    logger,
 	}
+	m.conns[conn] = false
 	go m.listen()
 	return m
 }
@@ -72,6 +73,11 @@ func (h *packetHandlerMap) SetServer(s unknownPacketHandler) {
 	h.server = s
 	h.mutex.Unlock()
 }
+
+func (h *packetHandlerMap) AddConn(conn net.PacketConn) {
+	h.conns[conn] = false
+}
+
 
 func (h *packetHandlerMap) CloseServer() {
 	h.mutex.Lock()
@@ -119,13 +125,24 @@ func (h *packetHandlerMap) close(e error) error {
 	return nil
 }
 
-func (h *packetHandlerMap) listen() {
+func (h* packetHandlerMap) listen() {
+	for {
+		for conn, active := range h.conns {
+			if !active {
+				h.conns[conn] = true
+				go h.listenConn(conn)
+			}
+		}
+	}
+}
+
+func (h *packetHandlerMap) listenConn(conn net.PacketConn) {
 	for {
 		data := *getPacketBuffer()
 		data = data[:protocol.MaxReceivePacketSize]
 		// The packet size should not exceed protocol.MaxReceivePacketSize bytes
 		// If it does, we only read a truncated packet, which will then end up undecryptable
-		n, addr, err := h.conn.ReadFrom(data)
+		n, addr, err := conn.ReadFrom(data)
 		if err != nil {
 			h.close(err)
 			return

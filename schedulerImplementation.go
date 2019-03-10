@@ -3,6 +3,7 @@ package quic
 import (
 	"errors"
 	"fmt"
+	"github.com/VividCortex/ewma"
 	"github.com/boisjacques/golang-utils"
 	"github.com/boisjacques/qed/internal/wire"
 	"github.com/tylerwince/godbg"
@@ -38,6 +39,7 @@ func NewScheduler(session Session, pconn net.PacketConn, remote net.Addr) *Sched
 		local:      pconn,
 		remote:     remote,
 		owd:        0,
+		vewma:      ewma.NewMovingAverage(5),
 	}
 	paths := make(map[uint32]*Path)
 	paths[pathZero.pathID] = pathZero
@@ -61,13 +63,16 @@ func NewScheduler(session Session, pconn net.PacketConn, remote net.Addr) *Sched
 		mode:            roundRobin,
 	}
 	scheduler.sockets[CRC(pconn.LocalAddr())] = pconn
+	godbg.Dbg("initialising scheduler")
 	for !scheduler.addressHelper.isInitalised {
-
+		time.Sleep(1 * time.Millisecond)
 	}
 	scheduler.localAddrs = scheduler.addressHelper.GetAddresses()
 	go scheduler.announceAddresses()
+	// go scheduler.modeSelectionTimer()
+	go scheduler.measurePathsRunner()
+	go scheduler.weighPathsRunner()
 	godbg.Dbg("Scheduler up and running")
-	godbg.Dbg(scheduler.sockets)
 	return scheduler
 }
 
@@ -95,14 +100,11 @@ func (s *SchedulerImplementation) Write(p []byte) error {
 		if err != nil {
 
 		}
-		godbg.Dbg(path.Write())
 		if path != nil && path.local != nil {
-			godbg.Dbg(path.Write())
 			break
 		}
 		s.session.(*session).logger.Errorf("nil path selected")
 	}
-	godbg.Dbg(path.Write())
 	_, err = path.local.WriteTo(p, path.remote)
 	if err != nil {
 		fmt.Println(err, util.Tracer())
@@ -151,16 +153,13 @@ func (s *SchedulerImplementation) getRoundRobinPath() (*Path, error) {
 func (s *SchedulerImplementation) newPath(local, remote net.Addr) error {
 	usock, err := s.openSocket(local)
 	if err != nil {
-		godbg.Dbg(err)
 		return err
 	}
 	if usock == nil {
 		err := errors.New("no socket returned")
-		godbg.Dbg(err)
 		return err
 	}
 	checksum := crc32.ChecksumIEEE(xor([]byte(local.String()), []byte(remote.String())))
-	godbg.Dbg(checksum)
 	p := NewPath(checksum, usock, remote, 1000)
 	s.paths[p.pathID] = p
 	s.pathIds = append(s.pathIds, p.pathID)
@@ -216,19 +215,11 @@ func (s *SchedulerImplementation) removePath(pathId uint32) {
 }
 
 func (s *SchedulerImplementation) announceAddresses() {
-	sessCtr := 0
-	actCtr := 0
 	for s.session == nil {
-		sessCtr++
-		if sessCtr%100000 == 0 {
-			godbg.Dbg("Nilsession")
-		}
+		time.Sleep(1 * time.Millisecond)
 	}
 	for !s.isActive {
-		actCtr++
-		if actCtr%100000 == 0 {
-			godbg.Dbg("Scheduler inactive")
-		}
+		time.Sleep(1 * time.Millisecond)
 	}
 	for _, addr := range s.localAddrs {
 		if addr != s.pathZero.local.LocalAddr() {
@@ -282,8 +273,8 @@ func (s *SchedulerImplementation) deletePath(pathId uint32) {
 	delete(s.paths, pathId)
 }
 
-func (s *SchedulerImplementation) setOwd(pathId uint32, owd int64) error {
-	s.paths[pathId].setOwd(owd)
+func (s *SchedulerImplementation) setOwd(pathId uint32, owd uint64) error {
+	s.paths[pathId].setOwd(float64(owd))
 	return nil
 }
 
@@ -294,6 +285,7 @@ func (s *SchedulerImplementation) openSocket(local net.Addr) (net.PacketConn, er
 		usock, err = net.ListenUDP("udp", local.(*net.UDPAddr))
 		if usock != nil {
 			s.sockets[CRC(local)] = usock
+			s.session.(*session).handlerManager.AddConn(usock)
 		}
 	}
 	return usock, err
@@ -302,10 +294,11 @@ func (s *SchedulerImplementation) openSocket(local net.Addr) (net.PacketConn, er
 func (s *SchedulerImplementation) measurePathsRunner() {
 	go func() {
 		for {
-			if s.isActive && s.mode == weightBased{
+			if s.isActive && s.mode == weightBased {
 				s.measurePaths()
+				godbg.Dbg("measuring paths")
 			}
-			time.Sleep(100 * time.Millisecond)
+			time.Sleep(1000 * time.Millisecond)
 		}
 	}()
 }
@@ -314,7 +307,6 @@ func (s *SchedulerImplementation) measurePathsRunner() {
 func (s *SchedulerImplementation) measurePaths() {
 	for _, path := range s.paths {
 		s.measurePath(path)
-		godbg.Dbg("measuring: " + path.Write())
 	}
 }
 
@@ -327,16 +319,17 @@ func (s *SchedulerImplementation) sumUpWeights() {
 	s.totalPathWeight = 0
 	for _, path := range s.paths {
 		s.totalPathWeight += path.weight
+		time.Sleep(10 * time.Millisecond)
 	}
 }
 
 func (s *SchedulerImplementation) weighPathsRunner() {
 	go func() {
 		for {
-			if s.isActive && s.mode == weightBased{
+			if s.isActive && s.mode == weightBased {
 				s.weighPaths()
 			}
-			time.Sleep(100 * time.Millisecond)
+			time.Sleep(500 * time.Millisecond)
 		}
 	}()
 }
@@ -361,12 +354,22 @@ func (s *SchedulerImplementation) weighPath(path *Path) {
 	}
 }
 
-// TODO: Put moving avg. here
-func (s *SchedulerImplementation) calculateAverageOwd() uint64 {
-	var aOwd uint64
+func (s *SchedulerImplementation) calculateAverageOwd() float64 {
+	var aOwd float64
 	for _, path := range s.paths {
-		aOwd += path.owd
+		aOwd += path.MovingAverage()
 	}
-	aOwd = aOwd / uint64(len(s.paths))
+	aOwd = aOwd / float64(len(s.paths))
 	return aOwd
+}
+
+func (s *SchedulerImplementation) modeSelectionTimer() {
+	for s.session == nil {
+		time.Sleep(1 * time.Millisecond)
+	}
+	for !s.isActive {
+		time.Sleep(1 * time.Millisecond)
+	}
+	time.Sleep(500 * time.Millisecond)
+	s.mode = weightBased
 }

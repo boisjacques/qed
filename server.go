@@ -35,6 +35,7 @@ type packetHandlerManager interface {
 	SetServer(unknownPacketHandler)
 	Remove(protocol.ConnectionID)
 	CloseServer()
+	AddConn(conn net.PacketConn)
 }
 
 type quicSession interface {
@@ -44,6 +45,7 @@ type quicSession interface {
 	run() error
 	destroy(error)
 	closeRemote(error)
+	SetPacketHandlerManager(manager packetHandlerManager)
 }
 
 type sessionRunner interface {
@@ -426,6 +428,7 @@ func (s *server) createNewSession(
 		return nil, err
 	}
 	sched.session = sess
+	sess.SetPacketHandlerManager(s.sessionHandler)
 	go sess.run()
 	return sess, nil
 }

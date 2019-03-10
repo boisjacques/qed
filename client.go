@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
+	"github.com/tylerwince/godbg"
 	"net"
 	"sync"
 
@@ -224,10 +225,7 @@ func populateClientConfig(config *Config, createdPacketConn bool) *Config {
 	} else if maxIncomingUniStreams < 0 {
 		maxIncomingUniStreams = 0
 	}
-	connIDLen := config.ConnectionIDLength
-	if connIDLen == 0 && !createdPacketConn {
-		connIDLen = protocol.DefaultConnectionIDLength
-	}
+	connIDLen := protocol.DefaultConnectionIDLength
 
 	return &Config{
 		Versions:                              versions,
@@ -252,7 +250,9 @@ func (c *client) generateConnectionIDs() error {
 		return err
 	}
 	c.srcConnID = srcConnID
+	godbg.Dbg(c.srcConnID)
 	c.destConnID = destConnID
+	godbg.Dbg(c.destConnID)
 	return nil
 }
 
@@ -435,6 +435,7 @@ func (c *client) createNewTLSSession(version protocol.VersionNumber) error {
 	}
 	c.session = sess
 	c.packetHandlers.Add(c.srcConnID, c)
+	c.session.SetPacketHandlerManager(c.packetHandlers)
 	return nil
 }
 

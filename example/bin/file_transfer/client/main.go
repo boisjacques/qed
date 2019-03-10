@@ -1,16 +1,12 @@
 package main
 
 import (
-	"crypto/sha256"
 	"crypto/tls"
 	"flag"
 	"fmt"
 	"github.com/boisjacques/qed"
-	"log"
-	"math/rand"
-	"net"
+	"io"
 	"os"
-	"time"
 )
 
 func main() {
@@ -22,67 +18,42 @@ func main() {
 	flag.Parse()
 
 	if addr == "" {
-		interfaces, _ := net.Interfaces()
-		for _, iface := range interfaces {
-			if iface.Name == "en0" {
-				addrs, err := iface.Addrs()
-				if err != nil {
-					fmt.Println(err)
-					return
-				}
-				_addr := addrs[1].String()
-				min3 := len(_addr) - 3
-				addr = _addr[:min3] + ":4433"
-			}
-		}
+		fmt.Println("no address provided")
+		os.Exit(-1)
 	}
 
-	var message []byte
-	var messageLen uint64
-
-	if path != "" {
-
-		f, err := os.Open(path)
-		if err != nil {
-			panic(err)
-		}
-		defer f.Close()
-
-		message = make([]byte, 0)
-		f.Read(message)
-	} else {
-		messageLen = 100 * 1e6
-		message = make([]byte, messageLen)
-		rand.Seed(time.Now().UnixNano())
-		rand.Read(message)
+	file, err := os.Open(path)
+	if err != nil {
+		panic(err)
 	}
+	defer file.Close()
 
 	session, err := quic.DialAddr(addr, &tls.Config{InsecureSkipVerify: true}, nil)
 	if err != nil {
-		println(err.Error())
-		return
+		panic(err.Error())
 	}
 
 	stream, err := session.OpenStreamSync()
 	if err != nil {
-		println(err.Error())
-		return
+		panic(err.Error())
 	}
-	hasher := sha256.New()
-	hasher.Write(message)
-	sha := hasher.Sum(nil)
-	log.Printf("SHA256 of message is %b", sha)
 
-	var i uint64
-	iteration := messageLen / 1000
-	for i = 0; i < iteration; i++ {
-		start := 1000 * i
-		end := 1000 * (i+1)
-		_, err = stream.Write(message[start:end])
-		if err != nil {
-			return
+	sendBuffer := make([]byte, 512)
+
+	for {
+		_, err = file.Read(sendBuffer)
+		if err == io.EOF {
+			break
+		}
+		_, sendError := stream.Write(sendBuffer)
+		if sendError != nil {
+			println(sendError)
 		}
 	}
-
+	err = nil
+	err = stream.Close()
+	if err != nil {
+		panic(err)
+	}
 
 }

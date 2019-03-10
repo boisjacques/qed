@@ -2,6 +2,7 @@ package quic
 
 import (
 	"fmt"
+	"github.com/VividCortex/ewma"
 	"net"
 )
 
@@ -11,9 +12,10 @@ type Path struct {
 	isPathZero bool
 	pathID     uint32
 	weight     int
-	owd        uint64
+	owd        float64
 	local      net.PacketConn
 	remote     net.Addr
+	vewma      ewma.MovingAverage
 }
 
 func NewPath(pathId uint32, pconn net.PacketConn, remote net.Addr, weight int) *Path {
@@ -24,6 +26,7 @@ func NewPath(pathId uint32, pconn net.PacketConn, remote net.Addr, weight int) *
 		owd:        0,
 		local:      pconn,
 		remote:     remote,
+		vewma:      ewma.NewMovingAverage(5),
 	}
 }
 
@@ -35,8 +38,9 @@ func (p *Path) GetPathID() uint32 {
 	return p.pathID
 }
 
-func (p *Path) setOwd(owd int64) {
-	p.owd = uint64(owd)
+func (p *Path) setOwd(owd float64) {
+	p.vewma.Add(owd)
+	p.owd = owd
 }
 
 func (p *Path) contains(address net.Addr) bool {
@@ -45,4 +49,11 @@ func (p *Path) contains(address net.Addr) bool {
 
 func (p *Path) Write() string {
 	return fmt.Sprintf("%d\n%s\n%s", p.pathID, p.local.LocalAddr().String(), p.remote.String())
+}
+
+func (p *Path) MovingAverage() float64 {
+	if p.vewma.Value() == 0.0 {
+		return p.owd
+	}
+	return p.vewma.Value()
 }

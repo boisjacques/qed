@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto/rand"
 	"fmt"
+	"github.com/tylerwince/godbg"
 	"io"
 )
 
@@ -18,6 +19,8 @@ func GenerateConnectionID(len int) (ConnectionID, error) {
 	if _, err := rand.Read(b); err != nil {
 		return nil, err
 	}
+	godbg.Dbg(len)
+	godbg.Dbg(b)
 	return ConnectionID(b), nil
 }
 

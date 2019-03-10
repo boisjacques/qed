@@ -127,6 +127,8 @@ type session struct {
 	keepAlivePingSent bool
 
 	logger utils.Logger
+
+	handlerManager packetHandlerManager
 }
 
 var _ Session = &session{}
@@ -428,6 +430,10 @@ func (s *session) Context() context.Context {
 	return s.ctx
 }
 
+func (s *session) SetPacketHandlerManager(mgr packetHandlerManager) {
+	s.handlerManager = mgr
+}
+
 func (s *session) ConnectionState() ConnectionState {
 	return s.cryptoStreamHandler.ConnectionState()
 }
@@ -712,7 +718,7 @@ func (s *session) handleAddressModificationFrame(frame *wire.AddrModFrame) error
 }
 
 func (s *session) handleOneWayDelayFrame(frame *wire.OwdFrame) error {
-	owd := time.Now().UnixNano() - frame.Time()
+	owd := uint64(time.Now().Unix()) - uint64(frame.Time())
 	f := wire.NewOwdAckFrame(frame.PathID(), owd)
 	s.queueControlFrame(f)
 	return nil

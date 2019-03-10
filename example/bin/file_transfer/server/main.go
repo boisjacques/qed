@@ -6,9 +6,12 @@ import (
 	"crypto/sha256"
 	"crypto/tls"
 	"crypto/x509"
+	"encoding/hex"
 	"encoding/pem"
 	"flag"
+	"fmt"
 	"github.com/boisjacques/qed"
+	"io/ioutil"
 	"log"
 	"math/big"
 	"os"
@@ -18,42 +21,59 @@ import (
 func main() {
 	var addr string
 	var path string
-	flag.StringVar(&addr, "addr", "0.0.0.0:4433", "address:port")
+	flag.StringVar(&addr, "addr", "", "address:port")
 	flag.StringVar(&path, "path", "out.file", "/path/to/file")
 
 	flag.Parse()
 
-	listener, err := quic.ListenAddr(addr, generateTLSConfig(), nil)
+	if addr == "" {
+		fmt.Println("no address provided")
+		os.Exit(-1)
+	}
 
-	f, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE, 0755)
+	listener, err := quic.ListenAddr(addr, generateTLSConfig(), nil)
 	if err != nil {
 		panic(err)
 	}
-	defer f.Close()
 
 	if err != nil {
-		return
+		panic(err)
 	}
-	sess, err := listener.Accept()
+	for {
+		sess, err := listener.Accept()
+		if err != nil {
+			panic(err)
+		}
+
+		go handleSession(sess, path)
+	}
+}
+
+func handleSession(sess quic.Session, path string) {
+	file, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE, 0755)
 	if err != nil {
-		return
+		panic(err)
 	}
+	defer file.Close()
 	stream, err := sess.AcceptStream()
 	if err != nil {
 		panic(err)
 	}
 	recv := make([]byte, 0)
-	if _,err := stream.Read(recv); err != nil {
-		log.Fatalf("error reading from stream %s: %s", stream.StreamID().StreamNum(), err)
+	for {
+		if _, err := stream.Read(recv); err != nil {
+			log.Fatalf("error reading from stream %s: %s", stream.StreamID().StreamNum(), err)
+			panic(err)
+		}
 	}
-	log.Printf("server shut down at: %s", time.Now())
 	hasher := sha256.New()
 	hasher.Write(recv)
-	sha := hasher.Sum(nil)
+	sha := hex.EncodeToString(hasher.Sum(nil))
 	log.Printf("SHA256 of message is %b", sha)
 
-	if _,err := f.Write(recv); err != nil {
+	if err := ioutil.WriteFile(path, recv, 0644); err != nil {
 		log.Fatalf("error writing file: %s", err)
+		panic(err)
 	}
 }
 
@@ -73,18 +93,19 @@ func generateTLSConfig() *tls.Config {
 	certPEM := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: certDER})
 
 	// Copied from golang.org language documentation
-	keyOut, err := os.OpenFile("key.pem", os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
+	keyFileName := "key-" + time.Now().String() + ".pem"
+	keyOut, err := os.OpenFile(keyFileName, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
 	if err != nil {
-		log.Print("failed to open key.pem for writing:", err)
+		log.Printf("failed to open %s for writing: %s", keyFileName, err)
 		panic(err)
 	}
-	if _,err := keyOut.Write(keyPEM); err != nil {
+	if _, err := keyOut.Write(keyPEM); err != nil {
 		log.Fatalf("error writing key: %s", err)
 	}
 	if err := keyOut.Close(); err != nil {
-		log.Fatalf("error closing key.pem: %s", err)
+		log.Fatalf("error closing %s: %s", keyFileName, err)
 	}
-	log.Print("wrote key.pem\n")
+	log.Printf("wrote %s\n", keyFileName)
 
 	tlsCert, err := tls.X509KeyPair(certPEM, keyPEM)
 	if err != nil {
