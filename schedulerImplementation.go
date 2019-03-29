@@ -283,9 +283,14 @@ func (s *SchedulerImplementation) openSocket(local net.Addr) (net.PacketConn, er
 	usock, contains := s.sockets[CRC(local)]
 	if !contains {
 		usock, err = net.ListenUDP("udp", local.(*net.UDPAddr))
+		if err != nil {
+			panic(err)
+		}
 		if usock != nil {
 			s.sockets[CRC(local)] = usock
 			s.session.(*session).handlerManager.AddConn(usock)
+		} else {
+			panic("nilsocket returned")
 		}
 	}
 	return usock, err
@@ -298,12 +303,11 @@ func (s *SchedulerImplementation) measurePathsRunner() {
 				s.measurePaths()
 				godbg.Dbg("measuring paths")
 			}
-			time.Sleep(1000 * time.Millisecond)
+			time.Sleep(10 * time.Second)
 		}
 	}()
 }
 
-// If deadlock look here
 func (s *SchedulerImplementation) measurePaths() {
 	for _, path := range s.paths {
 		s.measurePath(path)

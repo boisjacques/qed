@@ -3,6 +3,7 @@ package ackhandler
 import (
 	"errors"
 	"fmt"
+	"github.com/tylerwince/godbg"
 	"math"
 	"time"
 
@@ -343,12 +344,15 @@ func (h *sentPacketHandler) detectLostPackets(now time.Time, priorInFlight proto
 		}
 		return true, nil
 	})
-	if h.logger.Debug() && len(lostPackets) > 0 {
+	if len(lostPackets) > 0 {
 		pns := make([]protocol.PacketNumber, len(lostPackets))
 		for i, p := range lostPackets {
 			pns[i] = p.PacketNumber
 		}
-		h.logger.Debugf("\tlost packets (%d): %#x", len(pns), pns)
+		if h.logger.Debug() {
+			h.logger.Debugf("\tlost packets (%d): %#x", len(pns), pns)
+		}
+		godbg.Dbg(pns)
 	}
 
 	for _, p := range lostPackets {

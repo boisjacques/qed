@@ -65,7 +65,7 @@ func (f *OwdFrame) Write(b *bytes.Buffer, version protocol.VersionNumber) error 
 }
 
 func (f *OwdFrame) Length(version protocol.VersionNumber) protocol.ByteCount {
-	length := utils.VarIntLen(uint64(f.pathID))
+	length := 1 + utils.VarIntLen(uint64(f.pathID))
 	length += utils.VarIntLen(uint64(f.time))
 	return length
 }
