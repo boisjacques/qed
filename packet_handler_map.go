@@ -18,8 +18,9 @@ import (
 // * when multiplexing outgoing connections to store clients
 type packetHandlerMap struct {
 	mutex sync.RWMutex
+	lock  sync.RWMutex
 
-	conn      net.PacketConn
+	conns     map[net.PacketConn]bool
 	connIDLen int
 
 	handlers map[string] /* string(ConnectionID)*/ packetHandler
@@ -35,12 +36,13 @@ var _ packetHandlerManager = &packetHandlerMap{}
 
 func newPacketHandlerMap(conn net.PacketConn, connIDLen int, logger utils.Logger) packetHandlerManager {
 	m := &packetHandlerMap{
-		conn:                      conn,
+		conns:                     make(map[net.PacketConn]bool),
 		connIDLen:                 connIDLen,
 		handlers:                  make(map[string]packetHandler),
 		deleteClosedSessionsAfter: protocol.ClosedSessionDeleteTimeout,
 		logger:                    logger,
 	}
+	m.conns[conn] = false
 	go m.listen()
 	return m
 }
@@ -71,6 +73,12 @@ func (h *packetHandlerMap) SetServer(s unknownPacketHandler) {
 	h.mutex.Lock()
 	h.server = s
 	h.mutex.Unlock()
+}
+
+func (h *packetHandlerMap) AddConn(conn net.PacketConn) {
+	h.lock.Lock()
+	h.conns[conn] = false
+	h.lock.Unlock()
 }
 
 func (h *packetHandlerMap) CloseServer() {
@@ -121,12 +129,26 @@ func (h *packetHandlerMap) close(e error) error {
 
 func (h *packetHandlerMap) listen() {
 	for {
+		h.lock.Lock()
+		for conn, active := range h.conns {
+			if !active {
+				h.conns[conn] = true
+				go h.listenConn(conn)
+			}
+		}
+		h.lock.Unlock()
+	}
+}
+
+func (h *packetHandlerMap) listenConn(conn net.PacketConn) {
+	for {
 		data := *getPacketBuffer()
 		data = data[:protocol.MaxReceivePacketSize]
 		// The packet size should not exceed protocol.MaxReceivePacketSize bytes
 		// If it does, we only read a truncated packet, which will then end up undecryptable
-		n, addr, err := h.conn.ReadFrom(data)
+		n, addr, err := conn.ReadFrom(data)
 		if err != nil {
+			panic(err)
 			h.close(err)
 			return
 		}
@@ -162,6 +184,7 @@ func (h *packetHandlerMap) handlePacket(addr net.Addr, data []byte) error {
 	}
 	if !ok {
 		if server == nil { // no server set
+			//panic("unexpected connection id")
 			return fmt.Errorf("received a packet with an unexpected Connection ID %s", iHdr.DestConnectionID)
 		}
 		handlePacket = server.handlePacket

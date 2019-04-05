@@ -1,58 +1,29 @@
 package quic
 
 import (
-	"fmt"
+	"hash/crc32"
 	"log"
 	"net"
 	"strings"
-	"sync"
-	"time"
 )
 
 type AddressHelper struct {
-	ipAddresses   map[net.Addr]bool
-	sockets       map[net.Addr]net.PacketConn
-	listeners     []chan net.Addr
-	lockAddresses sync.RWMutex
-	lockSockets   sync.RWMutex
+	ipAddresses  map[uint32]net.Addr
+	listeners    []chan map[uint32]net.Addr
+	isInitalised bool
 }
 
-var addrHlp *AddressHelper
-var once sync.Once
+func NewAddressHelper() *AddressHelper {
+	addrHlp := &AddressHelper{
+		ipAddresses: make(map[uint32]net.Addr),
+		listeners:   make([]chan map[uint32]net.Addr, 0),
+	}
+	addrHlp.gatherAddresses()
 
-func GetAddressHelper() *AddressHelper {
-	once.Do(func() {
-		addrHlp = &AddressHelper{
-			make(map[net.Addr]bool),
-			make(map[net.Addr]net.PacketConn),
-			make([]chan net.Addr, 0),
-			sync.RWMutex{},
-			sync.RWMutex{},
-		}
-		go func() {
-			for {
-				addrHlp.gatherAddresses()
-				time.Sleep(100 * time.Millisecond)
-			}
-		}()
-	})
 	return addrHlp
 }
-
-func (a *AddressHelper) Subscribe(c chan net.Addr) {
-	a.listeners = append(a.listeners, c)
-}
-
-func (a *AddressHelper) publish(msg net.Addr) {
-	if len(a.listeners) > 0 {
-		for _, c := range a.listeners {
-			c <- msg
-		}
-	}
-}
-
 func (a *AddressHelper) gatherAddresses() {
-	a.falsifyAddresses()
+	a.ipAddresses = make(map[uint32]net.Addr)
 	interfaces, _ := net.Interfaces()
 	for _, iface := range interfaces {
 		flags := iface.Flags.String()
@@ -68,87 +39,29 @@ func (a *AddressHelper) gatherAddresses() {
 					if err != nil {
 						log.Println(err)
 					} else {
-						if a.containsAddress(udpAddr) {
-							a.write(udpAddr, true)
-						}
-						if !a.containsAddress(udpAddr) {
-							a.write(udpAddr, true)
-							a.publish(udpAddr)
-						}
+						a.write(udpAddr)
 					}
+
 				}
 			}
 		}
 	}
-	if err := a.cleanUp(); err != nil {
-		log.Fatalf("error %s occurred during address handler clean up", err)
-	}
+	a.isInitalised = true
 }
 
-func (a *AddressHelper) openSocket(local net.Addr) (net.PacketConn, error) {
-	a.lockSockets.Lock()
-	defer a.lockSockets.Unlock()
-	var err error = nil
-	usock, contains := a.sockets[local]
-	if !contains {
-		usock, err = net.ListenUDP("udp", local.(*net.UDPAddr))
-		a.sockets[local] = usock
-	}
-	return usock, err
+func (a *AddressHelper) GetAddresses() map[uint32]net.Addr {
+	return a.ipAddresses
 }
 
-func (a *AddressHelper) cleanUp() error {
-	a.lockAddresses.Lock()
-	defer a.lockAddresses.Unlock()
-	for key, value := range a.ipAddresses {
-		if value == false {
-			a.publish(key)
-			time.Sleep(100 * time.Millisecond) //Wait 100 ms for handling in scheduler
-			if a.containsSocket(key) {
-				err := a.sockets[key].Close()
-				if err != nil {
-					fmt.Println(err)
-					return err
-				}
-			}
-			delete(a.ipAddresses, key)
-		}
-	}
-	return nil
-}
-
-func (a *AddressHelper) GetAddresses() *map[net.Addr]bool {
-	a.lockAddresses.RLock()
-	defer a.lockAddresses.RUnlock()
-	return &a.ipAddresses
-}
-
-func (a *AddressHelper) write(addr net.Addr, bool bool) {
-	a.lockAddresses.Lock()
-	defer a.lockAddresses.Unlock()
-	a.ipAddresses[addr] = bool
+func (a *AddressHelper) write(addr net.Addr) {
+	checksum := crc32.ChecksumIEEE([]byte(addr.String()))
+	a.ipAddresses[checksum] = addr
 }
 
 func (a *AddressHelper) containsAddress(addr net.Addr) bool {
-	a.lockAddresses.RLock()
-	defer a.lockAddresses.RUnlock()
-	_, contains := a.ipAddresses[addr]
+	checksum := crc32.ChecksumIEEE([]byte(addr.String()))
+	_, contains := a.ipAddresses[checksum]
 	return contains
-}
-
-func (a *AddressHelper) containsSocket(addr net.Addr) bool {
-	a.lockSockets.RLock()
-	defer a.lockSockets.RUnlock()
-	_, contains := a.sockets[addr]
-	return contains
-}
-
-func (a *AddressHelper) falsifyAddresses() {
-	a.lockAddresses.Lock()
-	defer a.lockAddresses.Unlock()
-	for address := range a.ipAddresses {
-		a.ipAddresses[address] = false
-	}
 }
 
 func isLinkLocal(addr string) bool {
@@ -164,4 +77,8 @@ func isLinkLocal(addr string) bool {
 	} else {
 		return false
 	}
+}
+
+func CRC(addr net.Addr) uint32 {
+	return crc32.ChecksumIEEE([]byte(addr.String()))
 }

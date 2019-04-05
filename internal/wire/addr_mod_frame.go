@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"github.com/boisjacques/qed/internal/protocol"
 	"github.com/boisjacques/qed/internal/utils"
+	"io"
 	"net"
 )
 
@@ -45,7 +46,7 @@ func NewAddrModFrame(operation AddressModificationOperation, version IpVersion, 
 	return &AddrModFrame{
 		operation:      operation,
 		addressVersion: version,
-		address:        addr,
+		address:        addr.(*net.UDPAddr),
 	}
 }
 
@@ -70,11 +71,17 @@ func parseAddrModFrame(r *bytes.Reader, version protocol.VersionNumber) (*AddrMo
 	}
 	addressVersion = IpVersion(av)
 
-	addr, err := utils.ReadVarInt(r)
+	addrLen, err := utils.ReadVarInt(r)
 	if err != nil {
 		return nil, err
 	}
-	address, err = net.ResolveUDPAddr("udp", string(addr))
+
+	addr := make([]byte, addrLen)
+	if _, err := io.ReadFull(r, addr); err != nil {
+		return nil, err
+	}
+	strAddr := string(addr)
+	address, err = net.ResolveUDPAddr("udp", strAddr)
 	if err != nil {
 		return nil, err
 	}
@@ -91,6 +98,8 @@ func (f *AddrModFrame) Write(b *bytes.Buffer, version protocol.VersionNumber) er
 	b.WriteByte(typeByte)
 	utils.WriteVarInt(b, uint64(f.operation))
 	utils.WriteVarInt(b, uint64(f.addressVersion))
+	// Encoding address length
+	utils.WriteVarInt(b, uint64(len(f.address.String())))
 	b.Write([]byte(f.address.String()))
 	return nil
 }

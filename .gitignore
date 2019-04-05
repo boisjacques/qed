@@ -9,3 +9,19 @@ example/bin/server/out\.file
 out\.file
 
 key\.pem
+
+example/addressHelperTest/ahTest\.go
+
+example/bin/echo/client/rundebug\.sh
+
+example/bin/echo/server/rundebug\.sh
+
+*.bin
+
+example/bin/file_transfer/client/reader\.go
+
+example/bin/file_transfer/client/payload
+
+*.pem
+
+*.pcapng

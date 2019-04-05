@@ -18,6 +18,10 @@ func IsFrameRetransmittable(f wire.Frame) bool {
 	switch f.(type) {
 	case *wire.AckFrame:
 		return false
+	case *wire.OwdAckFrame:
+		return false
+	case *wire.OwdFrame:
+		return false
 	default:
 		return true
 	}

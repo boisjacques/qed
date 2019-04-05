@@ -35,6 +35,7 @@ type packetHandlerManager interface {
 	SetServer(unknownPacketHandler)
 	Remove(protocol.ConnectionID)
 	CloseServer()
+	AddConn(conn net.PacketConn)
 }
 
 type quicSession interface {
@@ -44,6 +45,7 @@ type quicSession interface {
 	run() error
 	destroy(error)
 	closeRemote(error)
+	SetPacketHandlerManager(manager packetHandlerManager)
 }
 
 type sessionRunner interface {
@@ -78,7 +80,16 @@ type server struct {
 	sessionHandler packetHandlerManager
 
 	// set as a member, so they can be set in the tests
-	newSession func(sessionRunner, protocol.ConnectionID /* original Connection ID */, protocol.ConnectionID /* destination Connection ID */, protocol.ConnectionID /* source Connection ID */, *Config, *tls.Config, *handshake.TransportParameters, utils.Logger, protocol.VersionNumber) (quicSession, error)
+	newSession func(Connection,
+		sessionRunner,
+		protocol.ConnectionID /* original Connection ID */,
+		protocol.ConnectionID /* destination Connection ID */,
+		protocol.ConnectionID /* source Connection ID */,
+		*Config,
+		*tls.Config,
+		*handshake.TransportParameters,
+		utils.Logger,
+		protocol.VersionNumber) (quicSession, error)
 
 	serverError error
 	errorChan   chan struct{}
@@ -400,7 +411,9 @@ func (s *server) createNewSession(
 		StatelessResetToken:  bytes.Repeat([]byte{42}, 16),
 		OriginalConnectionID: origDestConnID,
 	}
+	sched := NewScheduler(nil, s.conn, remoteAddr)
 	sess, err := s.newSession(
+		sched,
 		s.sessionRunner,
 		clientDestConnID,
 		destConnID,
@@ -411,10 +424,11 @@ func (s *server) createNewSession(
 		s.logger,
 		version,
 	)
-	sess.(*session).AddScheduler(NewScheduler(sess.(*session), s.conn, remoteAddr))
 	if err != nil {
 		return nil, err
 	}
+	sched.session = sess
+	sess.SetPacketHandlerManager(s.sessionHandler)
 	go sess.run()
 	return sess, nil
 }

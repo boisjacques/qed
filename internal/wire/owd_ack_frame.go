@@ -10,10 +10,10 @@ import (
 // It is part of the QED extension
 type OwdAckFrame struct {
 	pathID uint32
-	owd    int64
+	owd    uint64
 }
 
-func (o *OwdAckFrame) Owd() int64 {
+func (o *OwdAckFrame) Owd() uint64 {
 	return o.owd
 }
 
@@ -21,7 +21,7 @@ func (o *OwdAckFrame) PathID() uint32 {
 	return o.pathID
 }
 
-func NewOwdAckFrame(pathId uint32, owd int64) *OwdAckFrame {
+func NewOwdAckFrame(pathId uint32, owd uint64) *OwdAckFrame {
 	return &OwdAckFrame{
 		pathID: pathId,
 		owd:    owd,
@@ -35,7 +35,7 @@ func parseOwdAckFrame(r *bytes.Reader, version protocol.VersionNumber) (*OwdAckF
 	}
 
 	var pathID uint32
-	var owd int64
+	var owd uint64
 
 	pi, err := utils.ReadVarInt(r)
 	if err != nil {
@@ -47,7 +47,7 @@ func parseOwdAckFrame(r *bytes.Reader, version protocol.VersionNumber) (*OwdAckF
 	if err != nil {
 		return nil, err
 	}
-	owd = int64(t)
+	owd = uint64(t)
 
 	return &OwdAckFrame{
 		pathID: pathID,
@@ -64,7 +64,7 @@ func (f *OwdAckFrame) Write(b *bytes.Buffer, version protocol.VersionNumber) err
 }
 
 func (f *OwdAckFrame) Length(version protocol.VersionNumber) protocol.ByteCount {
-	length := utils.VarIntLen(uint64(f.pathID))
+	length := 1 + utils.VarIntLen(uint64(f.pathID))
 	length += utils.VarIntLen(uint64(f.owd))
 	return length
 }

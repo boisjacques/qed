@@ -11,10 +11,10 @@ import (
 // It is part of the QED extension
 type OwdFrame struct {
 	pathID uint32
-	time   int64
+	time   uint64
 }
 
-func (o *OwdFrame) Time() int64 {
+func (o *OwdFrame) Time() uint64 {
 	return o.time
 }
 
@@ -29,7 +29,7 @@ func parseOwdFrame(r *bytes.Reader, version protocol.VersionNumber) (*OwdFrame, 
 	}
 
 	var pathID uint32
-	var time int64
+	var time uint64
 
 	pi, err := utils.ReadVarInt(r)
 	if err != nil {
@@ -41,7 +41,7 @@ func parseOwdFrame(r *bytes.Reader, version protocol.VersionNumber) (*OwdFrame, 
 	if err != nil {
 		return nil, err
 	}
-	time = int64(t)
+	time = uint64(t)
 
 	return &OwdFrame{
 		pathID: pathID,
@@ -52,7 +52,7 @@ func parseOwdFrame(r *bytes.Reader, version protocol.VersionNumber) (*OwdFrame, 
 func NewOwdFrame(pathId uint32) *OwdFrame {
 	return &OwdFrame{
 		pathID: pathId,
-		time:   time.Now().UnixNano(),
+		time:   uint64(time.Now().Unix()),
 	}
 }
 
@@ -65,7 +65,7 @@ func (f *OwdFrame) Write(b *bytes.Buffer, version protocol.VersionNumber) error 
 }
 
 func (f *OwdFrame) Length(version protocol.VersionNumber) protocol.ByteCount {
-	length := utils.VarIntLen(uint64(f.pathID))
+	length := 1 + utils.VarIntLen(uint64(f.pathID))
 	length += utils.VarIntLen(uint64(f.time))
 	return length
 }
