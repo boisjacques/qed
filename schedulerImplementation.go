@@ -301,7 +301,6 @@ func (s *SchedulerImplementation) measurePathsRunner() {
 		for {
 			if s.isActive && s.mode == weightBased {
 				s.measurePaths()
-				godbg.Dbg("measuring paths")
 			}
 			time.Sleep(500 * time.Millisecond)
 		}
