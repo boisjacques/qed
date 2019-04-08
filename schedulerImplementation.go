@@ -69,7 +69,7 @@ func NewScheduler(session Session, pconn net.PacketConn, remote net.Addr) *Sched
 	}
 	scheduler.localAddrs = scheduler.addressHelper.GetAddresses()
 	go scheduler.announceAddresses()
-	// go scheduler.modeSelectionTimer()
+	go scheduler.modeSelectionTimer()
 	go scheduler.measurePathsRunner()
 	go scheduler.weighPathsRunner()
 	godbg.Dbg("Scheduler up and running")
@@ -303,7 +303,7 @@ func (s *SchedulerImplementation) measurePathsRunner() {
 				s.measurePaths()
 				godbg.Dbg("measuring paths")
 			}
-			time.Sleep(10 * time.Second)
+			time.Sleep(500 * time.Millisecond)
 		}
 	}()
 }
