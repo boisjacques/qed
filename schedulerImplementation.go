@@ -113,7 +113,9 @@ func (s *SchedulerImplementation) Write(p []byte) error {
 	return nil
 }
 
-func (s *SchedulerImplementation) Read([]byte) (int, net.Addr, error) { return 0, nil, errors.New("Not implemented yet") }
+func (s *SchedulerImplementation) Read([]byte) (int, net.Addr, error) {
+	return 0, nil, errors.New("Not implemented yet")
+}
 func (s *SchedulerImplementation) Close() error {
 	// TODO: Mock close
 	return errors.New("not implemented yet")
@@ -299,7 +301,7 @@ func (s *SchedulerImplementation) openSocket(local net.Addr) (net.PacketConn, er
 func (s *SchedulerImplementation) measurePathsRunner() {
 	go func() {
 		for {
-			if s.isActive && s.mode == weightBased {
+			if s.isActive {
 				s.measurePaths()
 			}
 			time.Sleep(500 * time.Millisecond)
