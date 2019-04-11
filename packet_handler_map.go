@@ -184,7 +184,6 @@ func (h *packetHandlerMap) handlePacket(addr net.Addr, data []byte) error {
 	}
 	if !ok {
 		if server == nil { // no server set
-			//panic("unexpected connection id")
 			return fmt.Errorf("received a packet with an unexpected Connection ID %s", iHdr.DestConnectionID)
 		}
 		handlePacket = server.handlePacket
